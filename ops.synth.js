@@ -116,34 +116,32 @@ const getOptimizedTrackPatterns = (track) => {
 	return optimized;
 };
 function buildAutomationMap() {
-	const autoMap = {};
+	const autoMap = { global: {} };
 	for (const track of tracks) {
 		if (track.muted) continue;
 		for (const [startStep, width, patId] of track.patterns) {
 			const pat = patterns[patId];
-			if (!pat) continue;
-			if (pat.type === "mod" && pat.associated) {
-				const [instName, stateKey, paramName] = pat.associated;
-				if (playheadStep >= startStep && playheadStep < startStep + width) {
-					if (!autoMap[stateKey]) autoMap[stateKey] = {};
-					autoMap[stateKey][paramName] = {
+			if (!pat || pat.type !== "mod" || !pat.associated) continue;
+			
+			const [target, param] = pat.associated;
+			if (playheadStep >= startStep && playheadStep < startStep + width) {
+				if (target === "SONG") {
+					autoMap.global[param] = {
 						points: pat.points,
 						min: pat.min,
 						max: pat.max,
 						clipStart: startStep
 					};
-				}
-			}
-			if (pat.category === "fx" && pat.associated) {
-				const [stateKey, paramName] = pat.associated;
-				if (playheadStep >= startStep && playheadStep < startStep + width) {
+				} else {
+    const stateKey = pat.category === "fx" ? target : (pat.associated[1] || target);
+					const paramName = pat.associated[2] || pat.associated[1];
 					if (!autoMap[stateKey]) autoMap[stateKey] = {};
 					autoMap[stateKey][paramName] = {
-						type: "fx",
 						points: pat.points,
 						min: pat.min,
 						max: pat.max,
-						clipStart: startStep
+						clipStart: startStep,
+						type: pat.category === "fx" ? "fx" : "mod"
 					};
 				}
 			}
@@ -151,20 +149,21 @@ function buildAutomationMap() {
 	}
 	return autoMap;
 }
+
 const InstrumentSynthesis = (params, patternId) => {
 	const { noteNumber, noteLengthInBeats, pattern, volume = 1 } = params;
+	let  bpm = BPM || 120;
 	if (!workletNode) return;
 	if(bufferLoaded)return;
 	workletNode.port.postMessage({
 	type: "SONGVOL",
 	songvolume: settings.songVolume
 });
-
 	const inst = getInstrument(pattern);
 	const stateKey = `${inst.name}_inst_${pattern.instance || 0}_pat_${patternId}`;
-	const instProxy = getCachedProxy('instrument', inst.name, pattern.instance || 0, "_inst_", "");
-let proxyBase = getAudioSafeProxy(instProxy);
-let proxy = { ...proxyBase };
+ const instProxy = getCachedProxy('instrument', inst.name, pattern.instance || 0, "_inst_", "");
+	let proxyBase = getAudioSafeProxy(instProxy);
+	let proxy = { ...proxyBase };
 if (Array.isArray(inst.sharedobject)) {
 	for (const pair of inst.sharedobject) {
 		const from = pair[0];
@@ -174,38 +173,42 @@ if (Array.isArray(inst.sharedobject)) {
 		}
 	}
 }
-	const bpm = window.BPM || 120;
+let totalShiftFreq = 1.0;
+let totalShiftSteps = 0; 
 	const voiceData = {
 		synthCode: inst.synth,
 		proxy: proxy,
 		stateKey: stateKey,
-		volume: volume  ,
-		songvolume: settings.songVolume,
+		instKey: `${inst.name}_inst_${pattern.instance || 0}`,
+		volume: volume,
+		songvolume: 1,
+		fxShiftFreq: totalShiftFreq, 
 		instanceId: stateKey,
-		fxChain: (pattern.fx || []).map(fxKey => {
-			const [type, idx] = fxKey.split("_fx_");
-			return {
-				id: fxKey,
-				fxStateKey: fxKey,
-				code: window.Effects[type].process,
-				proxy: getAudioSafeProxy(
-					getCachedProxy('effect', type, parseInt(idx), "_fx_"),
-					true
-				),
-				state: { inL: 0, inR: 0, outL: 0, outR: 0, time: 0 }
-			};
-		}),
+		
+			fxChain: (pattern.fx || []).map(fxKey => {
+		const type = fxKey.split("_fx_")[0];
+		return {
+			id: fxKey,
+			code: window.Effects[type].process,
+			proxy: getAudioSafeProxy(
+				getCachedProxy('effect', type, parseInt(fxKey.split("_fx_")[1]), "_fx_"),
+				true
+			)
+		};
+	}),
 		ctx: {
-			notefreq: 440 * 2 ** ((noteNumber - 69) / 12),
-			noteNumber: noteNumber,
-			time: 0,
-			duration: (noteLengthInBeats * (60 / bpm) * 2),
-			disconnect: false,
-			pattern: { ...pattern, bpm: bpm }
+	notefreq: (440 * 2 ** ((noteNumber - 69) / 12)) ,
+	noteNumber: noteNumber ,
+	time: 0,
+	duration: noteLengthInBeats * (60 / bpm) * 2,
+	disconnect: false,
+	outL: 0, outR: 0,
+	automation: {},
+	pattern: { ...pattern, playingMidi: new Set(), bpm: bpm }
 		}
 	};
 	workletNode.port.postMessage({ type: 'ADD_VOICE', voice: voiceData });
-};;
+};
 function updateFx(pattern,patternId) {
 	if (!workletNode) return;
 	const stateKey = `${pattern.instrument}_inst_${pattern.instance || 0}_pat_${patternId}`;
@@ -305,221 +308,294 @@ function getAutomationValue(auto, currentStep) {
 	}
 	return auto.min + val * (auto.max - auto.min);
 }
+  
 async function renderSongBuffer(startStep = 0) {
-	const sharedData = {};
+    const sharedData = {};
     const sr = audioCtx.sampleRate;
     const stepsPerBeat = 4;
-    const bpm = window.BPM || 120;
-    const stepsPerSec = (bpm / 60) * stepsPerBeat;
-    const invSr = 1 / sr;
-    const deltaStepPerSample = stepsPerSec / sr;
     let maxStep = startStep;
+    
     tracks.forEach(track => {
         track.patterns.forEach(([s, w]) => { if (s + w > maxStep) maxStep = s + w; });
     });
-        const tailMarginSamples = 0;
-    const totalSamples = Math.ceil(((maxStep - startStep) / stepsPerSec) * sr) + tailMarginSamples;
+
+    const allModPatterns = [];
+    tracks.forEach(track => {
+        if (track.muted) return;
+        track.patterns.forEach(([s, w, id]) => {
+            const p = patterns[id];
+            if (!p) return;
+            if ((p.type === "mod" || p.category === "inst" || p.category === "fx") && p.associated) {
+                allModPatterns.push({
+                    start: s,
+                    end: s + w,
+                    pat: {
+                        points: p.points,
+                        min: p.min ?? 0,
+                        max: p.max ?? 1,
+                        associated: p.associated,
+                        clipStart: s
+                    }
+                });
+            }
+        });
+    });
+
+    const getSampleForStep = (targetStep) => {
+        let step = startStep;
+        let sample = 0;
+        let currentBpm = window.BPM || 120;
+        while (step < targetStep) {
+            let bpmVal = null;
+            for (let i = 0; i < allModPatterns.length; i++) {
+                const m = allModPatterns[i];
+                if (step >= m.start && step < m.end && m.pat.associated[0] === "SONG" && m.pat.associated[1] === "BPM") {
+                    bpmVal = getAutomationValue(m.pat, step);
+                }
+            }
+            if (bpmVal !== null) currentBpm = bpmVal;
+            step += ((currentBpm / 60) * stepsPerBeat) / sr;
+            sample++;
+        }
+        return sample;
+    };
+
+    const totalSamples = getSampleForStep(maxStep);
     const buffer = audioCtx.createBuffer(2, totalSamples, sr);
     const outL = buffer.getChannelData(0);
     const outR = buffer.getChannelData(1);
     const events = [];
     const effectCache = new Map();
     const persistentStates = new Map();
-    const orphanedTails = [];     const allModPatterns = [];
+    const orphanedTails = [];
+
     tracks.forEach(track => {
         if (track.muted) return;
         track.patterns.forEach(([s, w, id]) => {
-        const p = patterns[id];
-        if (!p) return;
-        if ((p.type === "mod" || p.category === "inst" || p.category === "fx") && p.associated) {
-        allModPatterns.push({
-        start: s,
-        end: s + w,
-        pat: {
-        points: p.points,
-        min: p.min ?? 0,
-        max: p.max ?? 1,
-        associated: p.associated,
-        clipStart: s
-        }
-        });
-        }
-        if (p.notes && p.notes.length > 0) {
-        const inst = getInstrument(p);
-        if (!inst._compiled) inst._compiled = new Function("synth", "int", "audioCtx", inst.synth);
-        const instProxyRaw = getCachedProxy("instrument", p.instrument, p.instance || 0);
-const proxy = getAudioSafeProxy(instProxyRaw);
+            const p = patterns[id];
+            if (!p) return;
+            if (p.notes && p.notes.length > 0) {
+                const inst = getInstrument(p);
+                if (!inst._compiled) inst._compiled = new Function("synth", "int", "audioCtx", inst.synth);
+                const instProxyRaw = getCachedProxy("instrument", p.instrument, p.instance || 0);
+                const proxy = getAudioSafeProxy(instProxyRaw);
 
-if (Array.isArray(getInstrument(p).sharedobject)) {
-	for (const pair of getInstrument(p).sharedobject) {
-		const from = pair[0];
-		const to = pair[1] || pair[0];
-		
-		if (from === "saved") {
-			const key = `${p.instrument}_${p.instance || 0}_shared`;
-			if (!sharedData[key]) sharedData[key] = instProxyRaw.saved;
-			proxy[to] = sharedData[key];
-			continue;
-		}
-		
-		if (instProxyRaw[from] !== undefined) {
-			proxy[to] = instProxyRaw[from];
-		}
-	}
-}
-        const stateKey = `${p.instrument}_inst_${p.instance || 0}`;
-        p.notes.forEach(note => {
-        	const noteStartStep = s + note.x;
-const noteStartSample = Math.floor(((noteStartStep - startStep) / stepsPerSec) * sr);
+                if (Array.isArray(getInstrument(p).sharedobject)) {
+                    for (const pair of getInstrument(p).sharedobject) {
+                        const from = pair[0];
+                        const to = pair[1] || pair[0];
+                        if (from === "saved") {
+                            const key = `${p.instrument}_${p.instance || 0}_shared`;
+                            if (!sharedData[key]) sharedData[key] = instProxyRaw.saved;
+                            proxy[to] = sharedData[key];
+                            continue;
+                        }
+                        if (instProxyRaw[from] !== undefined) proxy[to] = instProxyRaw[from];
+                    }
+                }
 
-events.push({
-sampleIndex: Math.max(0, noteStartSample),
-prewarm: noteStartSample < 0 ? -noteStartSample : 0,
-stopSample: Math.floor(((s + note.x + note.w - startStep) / stepsPerSec) * sr),
-note, inst, pattern: p, stateKey,
-fxHash: JSON.stringify(p.fx || []),
-instProxy: proxy
-});
-        });
-        }
+                const stateKey = `${inst.name}_inst_${p.instance || 0}_pat_${id}`;
+                p.notes.forEach(note => {
+                    const noteStartStep = s + note.x;
+                    const noteStartSample = getSampleForStep(noteStartStep);
+                    const stopSample = getSampleForStep(noteStartStep + note.w);
+
+                    events.push({
+                        sampleIndex: Math.max(0, noteStartSample),
+                        prewarm: noteStartSample < 0 ? -noteStartSample : 0,
+                        stopSample: stopSample,
+                        note, inst, pattern: p, stateKey,
+                        fxHash: JSON.stringify(p.fx || []),
+                        instProxy: proxy
+                    });
+                });
+            }
         });
     });
+
     events.sort((a, b) => a.sampleIndex - b.sampleIndex);
     let renderSynths = [];
     let eventIdx = 0;
     const mockCtx = { sampleRate: sr };
+    const invSr = 1 / sr;
+    let currentGlobalStep = startStep;
+
     for (let j = 0; j < totalSamples; j++) {
-    	if (renderAbort) return buffer;
-        const currentGlobalStep = startStep + (j * deltaStepPerSample);
+        if (renderAbort) return buffer;
+
+        let currentBpm = window.BPM || 120;
         const globalAutoValues = {};
+        
         for (let i = 0; i < allModPatterns.length; i++) {
-        const m = allModPatterns[i];
-        if (currentGlobalStep >= m.start && currentGlobalStep < m.end) {
-        const isInst = m.pat.associated.length === 3;
-        const sKey = isInst ? m.pat.associated[1] : m.pat.associated[0];
-        const paramName = isInst ? m.pat.associated[2] : m.pat.associated[1];
-        if (!globalAutoValues[sKey]) globalAutoValues[sKey] = {};
-        const val = getAutomationValue(m.pat, currentGlobalStep);
-        if (val !== null) globalAutoValues[sKey][paramName] = val;
+            const m = allModPatterns[i];
+            if (currentGlobalStep >= m.start && currentGlobalStep < m.end) {
+                const isInst = m.pat.associated.length === 3;
+                const sKey = isInst ? m.pat.associated[1] : (m.pat.associated[0] === "SONG" ? "global" : m.pat.associated[0]);
+                const paramName = isInst ? m.pat.associated[2] : m.pat.associated[1];
+                
+                if (!globalAutoValues[sKey]) globalAutoValues[sKey] = {};
+                const val = getAutomationValue(m.pat, currentGlobalStep);
+                if (val !== null) {
+                    globalAutoValues[sKey][paramName] = val;
+                    if (sKey === "global" && paramName === "BPM") currentBpm = val;
+                }
+            }
         }
-        }
+
+        const currentStepsPerSec = (currentBpm / 60) * stepsPerBeat;
+        const deltaStepPerSample = currentStepsPerSec / sr;
+
         while (eventIdx < events.length && events[eventIdx].sampleIndex <= j) {
-        const ev = events[eventIdx];
-        let instState = persistentStates.get(ev.stateKey);
-        if (!instState) {
-        instState = { fxChain: [], fxHash: "" };
-        persistentStates.set(ev.stateKey, instState);
+            const ev = events[eventIdx];
+            let instState = persistentStates.get(ev.stateKey);
+            if (!instState) {
+                instState = { fxChain: [], fxHash: "" };
+                persistentStates.set(ev.stateKey, instState);
+            }
+            if (instState.fxHash !== ev.fxHash) {
+                instState.fxChain.forEach(ef => { if (ef.state.isTailActive) orphanedTails.push(ef); });
+                instState.fxChain = (ev.pattern.fx || []).map(fxKey => {
+                    const type = fxKey.split("_fx_")[0];
+                    if (!effectCache.has(type)) effectCache.set(type, new Function("fx", "int", "audioCtx", window.Effects[type].process));
+                    return {
+                        id: fxKey,
+                        process: effectCache.get(type),
+                        proxy: getAudioSafeProxy(getCachedProxy('effect', type, parseInt(fxKey.split("_fx_")[1]), "_fx_"), true),
+                        state: { inL: 0, inR: 0, outL: 0, outR: 0, time: 0, automation: {}, isTailActive: false, silenceFrames: 0 }
+                    };
+                });
+                instState.fxHash = ev.fxHash;
+            }
+            const synthObj = {
+                ...ev,
+                volume: (ev.note.v || 1) * (window.settings?.songVolume || 1),
+                ctx: {
+                    notefreq: 440 * Math.pow(2, (ev.note.y - 69) / 12),
+                    noteNumber: ev.note.y,
+                    time: 0,
+                    duration: (ev.note.w / stepsPerBeat) * (60 / currentBpm) * 2,
+                    disconnect: false,
+                    outL: 0, outR: 0,
+                    automation: {},
+                    pattern: { ...ev.pattern, playingMidi: new Set(), bpm: currentBpm }
+                }
+            };
+            if (ev.prewarm > 0) {
+                for (let w = 0; w < ev.prewarm; w++) {
+                    synthObj.inst._compiled(synthObj.ctx, ev.instProxy, mockCtx);
+                    synthObj.ctx.time += invSr;
+                    if (synthObj.ctx.disconnect) break;
+                }
+            }
+            renderSynths.push(synthObj);
+            eventIdx++;
         }
-        if (instState.fxHash !== ev.fxHash) {
-        instState.fxChain.forEach(ef => {
-        if (ef.state.isTailActive) orphanedTails.push(ef);
+
+        const instanceShiftMultipliers = new Map();
+        persistentStates.forEach((instState, sKey) => {
+            let multiplier = 1.0;
+            instState.fxChain.forEach(ef => {
+                ef.state.inL = 0; ef.state.inR = 0;
+                ef.state.automation = globalAutoValues[ef.id] || {};
+                ef.process(ef.state, ef.proxy, mockCtx);
+                if (ef.state.shiftfreq !== undefined) multiplier *= ef.state.shiftfreq;
+            });
+            instanceShiftMultipliers.set(sKey, multiplier);
         });
-        instState.fxChain = (ev.pattern.fx || []).map(fxKey => {
-        const type = fxKey.split("_fx_")[0];
-        if (!effectCache.has(type)) effectCache.set(type, new Function("fx", "int", "audioCtx", window.Effects[type].process));
-        return {
-        id: fxKey,
-        process: effectCache.get(type),
-        proxy: getAudioSafeProxy(getCachedProxy('effect', type, parseInt(fxKey.split("_fx_")[1]), "_fx_"), true),
-        state: { inL: 0, inR: 0, outL: 0, outR: 0, time: 0, automation: {}, isTailActive: false, silenceFrames: 0 }
-        };
-        });
-        instState.fxHash = ev.fxHash;
-        }
-        const synthObj = {
-...ev,
-volume: (ev.note.v || 1) * (window.settings?.songVolume || 1),
-ctx: {
-notefreq: 440 * Math.pow(2, (ev.note.y - 69) / 12),
-noteNumber: ev.note.y,
-time: 0,
-duration: (ev.note.w / stepsPerBeat) * (60 / bpm) * 2,
-disconnect: false,
-outL: 0, outR: 0,
-automation: {},
-pattern: { ...ev.pattern, playingMidi: new Set(), bpm: bpm }
+
+const instanceBuckets = {};
+const activeMidiPerInstance = {};
+
+for (let k = 0; k < renderSynths.length; k++) {
+	const v = renderSynths[k];
+	if (j >= v.sampleIndex && j <= v.stopSample) {
+		if (!activeMidiPerInstance[v.instKey]) {
+			activeMidiPerInstance[v.instKey] = new Set();
+		}
+		activeMidiPerInstance[v.instKey].add(v.note.y);
+	}
 }
-};
-if(ev.prewarm>0){
-for(let w=0; w<ev.prewarm; w++){
-synthObj.inst._compiled(synthObj.ctx, ev.instProxy, mockCtx);
-synthObj.ctx.time += invSr;
-if(synthObj.ctx.disconnect) break;
-}
-}
-renderSynths.push(synthObj);
-        eventIdx++;
+for (let k = renderSynths.length - 1; k >= 0; k--) {
+const v = renderSynths[k]; 
+            const baseParams = {}; 
+            if (v.instProxy) { 
+                for (const prop in v.instProxy) {
+                    if (typeof v.instProxy[prop] === 'number') baseParams[prop] = v.instProxy[prop];
+                    else if (v.instProxy[prop]?.val !== undefined) baseParams[prop] = v.instProxy[prop].val;
+                }
+            }
+
+            v.ctx.bpm = Math.floor(currentBpm)
+            v.ctx.duration = (v.note.w / stepsPerBeat) * (60 / currentBpm) * 2;
+            v.ctx.fxShiftFreq = (instanceShiftMultipliers.get(v.stateKey) || 1.0);
+            v.ctx.automation = { ...baseParams, ...(globalAutoValues[v.stateKey] || {}) };
+
+            v.ctx.pattern.playingMidi = new Set(activeMidiPerInstance[v.instKey] || []);
+            v.ctx.outL = 0; v.ctx.outR = 0;
+
+            try {
+                v.inst._compiled(v.ctx, v.instProxy, mockCtx);
+            } catch (e) {
+                v.ctx.disconnect = true;
+            }
+
+            if (!instanceBuckets[v.stateKey]) instanceBuckets[v.stateKey] = { l: 0, r: 0 };
+            instanceBuckets[v.stateKey].l += v.ctx.outL * v.volume;
+            instanceBuckets[v.stateKey].r += v.ctx.outR * v.volume;
+            
+            v.ctx.time += invSr;
+            if (v.ctx.disconnect) renderSynths.splice(k, 1);
         }
-        const instanceBuckets = {};
-        const activeMidiPerInstance = {};
-        for (let k = renderSynths.length - 1; k >= 0; k--) {
-        const v = renderSynths[k];
-        if (j >= v.sampleIndex && j <= v.stopSample) {
-        if (!activeMidiPerInstance[v.stateKey]) activeMidiPerInstance[v.stateKey] = new Set();
-        activeMidiPerInstance[v.stateKey].add(v.note.y);
-        }
-        const baseParams = {};
-        if (v.instProxy) {
-        for (const prop in v.instProxy) {
-        if (typeof v.instProxy[prop] === 'number') baseParams[prop] = v.instProxy[prop];
-        else if (v.instProxy[prop]?.val !== undefined) baseParams[prop] = v.instProxy[prop].val;
-        }
-        }
-        v.ctx.automation = { ...baseParams, ...(globalAutoValues[v.stateKey] || {}) };
-        v.ctx.pattern.playingMidi = activeMidiPerInstance[v.stateKey] || new Set();
-        v.ctx.outL = 0; v.ctx.outR = 0;
-try {
-	v.inst._compiled(v.ctx, v.instProxy, mockCtx);
-} catch (e) {
-	v.ctx.disconnect = true;
-}
-        if (!instanceBuckets[v.stateKey]) instanceBuckets[v.stateKey] = { l: 0, r: 0 };
-        instanceBuckets[v.stateKey].l += v.ctx.outL * v.volume;
-        instanceBuckets[v.stateKey].r += v.ctx.outR * v.volume;
-        v.ctx.time += invSr;
-        if (v.ctx.disconnect) renderSynths.splice(k, 1);
-        }
+
         let finalL = 0;
         let finalR = 0;
         persistentStates.forEach((instState, sKey) => {
-        const bucket = instanceBuckets[sKey];
-        let curL = bucket ? bucket.l : 0;
-        let curR = bucket ? bucket.r : 0;
-        let anyTail = false;
-        instState.fxChain.forEach(ef => {
-        ef.state.inL = curL;
-        ef.state.inR = curR;
-        ef.state.automation = globalAutoValues[ef.id] || {};
-        ef.process(ef.state, ef.proxy, mockCtx);
-        curL = ef.state.outL;
-        curR = ef.state.outR;
-        ef.state.time += invSr;
-        if (ef.state.isTailActive) anyTail = true;
+            const bucket = instanceBuckets[sKey];
+            let curL = bucket ? bucket.l : 0;
+            let curR = bucket ? bucket.r : 0;
+            let anyTail = false;
+            instState.fxChain.forEach(ef => {
+                ef.state.inL = curL;
+                ef.state.inR = curR;
+                ef.state.automation = globalAutoValues[ef.id] || {};
+                ef.process(ef.state, ef.proxy, mockCtx);
+                curL = ef.state.outL;
+                curR = ef.state.outR;
+                ef.state.time += invSr;
+                if (ef.state.isTailActive) anyTail = true;
+            });
+            if (bucket || anyTail) {
+                finalL += curL;
+                finalR += curR;
+            } else {
+                persistentStates.delete(sKey);
+            }
         });
-        if (bucket || anyTail) {
-        finalL += curL;
-        finalR += curR;
-        } else {
-        persistentStates.delete(sKey);
-        }
-        });
+
         for (let k = orphanedTails.length - 1; k >= 0; k--) {
-        const ef = orphanedTails[k];
-        ef.state.inL = 0;
-        ef.state.inR = 0;
-        ef.state.automation = globalAutoValues[ef.id] || {};
-        ef.process(ef.state, ef.proxy, mockCtx);
-        finalL += ef.state.outL;
-        finalR += ef.state.outR;
-        ef.state.time += invSr;
-        if (!ef.state.isTailActive) orphanedTails.splice(k, 1);
+            const ef = orphanedTails[k];
+            ef.state.inL = 0; ef.state.inR = 0;
+            ef.state.automation = globalAutoValues[ef.id] || {};
+            ef.process(ef.state, ef.proxy, mockCtx);
+            finalL += ef.state.outL;
+            finalR += ef.state.outR;
+            ef.state.time += invSr;
+            if (!ef.state.isTailActive) orphanedTails.splice(k, 1);
         }
+
         outL[j] = finalL;
         outR[j] = finalR;
+        currentGlobalStep += deltaStepPerSample;
+
         if (j % 50000 === 0) await new Promise(r => setTimeout(r, 0));
     }
     return buffer;
 }
+
+
+
+
+
 let exportTextInterval;
 const exportTexts = [
 	"Negotiating with MP3 encoder...",
@@ -631,3 +707,5 @@ exportTextInterval = setInterval(setRandomExportText, 5000);
 		exportBg.style.opacity = 0;
 	}
 }
+
+

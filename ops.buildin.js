@@ -1,5 +1,3 @@
- 
-
 window.Effects = {
 "fdn_reverb": {
 	interface: `
@@ -185,7 +183,7 @@ const rebuildAutomations = () => {
  });
 };
 const bgRoot = new Node({style:{pos:'abs',t:'0%',l:'0%',w:'100%',h:'100%',bg:'window(theme.editorBg)'}});
-const panel = new Node({style:{pos:'abs',t:'20%',l:'10%',w:'80%',h:'160px',bg:'window(theme.boxcolor)',rad:10,pad:10,border:'1px solid #333'}});
+const panel = new Node({style:{pos:'abs',t:'20%',l:'10%',w:'80%',h:'calc(90% - 70px)', bg:'window(theme.boxcolor)',rad:10,pad:10,border:'1px solid #333'}});
 bgRoot.add(panel);
 
 if (!int.points) int.points = [];
@@ -399,7 +397,7 @@ if(fx.time>fx.duration){
             style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#0a0505', rad: 0, ov: 'hid' }
         });
         const panel = new Node({
-            style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h: '90%', bg: '#1a0f0f', rad: 10, pad: 20, border: "1px solid #ff4444" }
+            style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: '#1a0f0f', rad: 10, pad: 20, border: "1px solid #ff4444" }
         });
         
         const createKnob = (label, prop, min, max, val, lPos, unit = "") => {
@@ -509,67 +507,66 @@ if(fx.time>fx.duration){
  
     `
 },
-"delay":{
-	interface: `
-	int.automations = {
-	"wet": { min: 0, max: 2, step: 0.1, defpoint: 1 },
-	"feedback": { min: 0, max: 1, step: 0.1, defpoint: 1 },
-	"damp": { min: 0, max: 2, step: 0.1, defpoint: 1 },
-	"pre": { min: 0, max: 2, step: 0.1, defpoint: 1 },
-}
-        const modal = new Node({
-            style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#08080c', rad: 0, ov: 'hid' }
+"Echo": {
+    interface: `
+    int.automations = {
+        "Echo Vol": { min: 0, max: 1, step: 0.01, defpoint: 0.5 },
+        "Echo Delay": { min: 0.01, max: 1, step: 0.01, defpoint: 0.3 },
+        "Echo Feedback": { min: 0, max: 0.9, step: 0.01, defpoint: 0.4 }
+    };
+    const modal = new Node({
+        style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#08080c', rad: 0, ov: 'hid' }
+    });
+    const panel = new Node({
+        style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: '#14141d', rad: 10, pad: 20, border: "1px solid #333" }
+    });
+    
+    const createKnob = (label, prop, min, max, val, lPos) => {
+        const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
+        int[prop] = new Knob({
+            min: min, max: max, value: val, sensitivity: 0.1,
+            style: { w: 60, h: 60, knobColor: '#ffcc00', trackColor: '#222' }
         });
-        const panel = new Node({
-            style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h: '90%', bg: '#14141d', rad: 10, pad: 20, border: "1px solid #333" }
-        });
-        
-        const createKnob = (label, prop, min, max, val, lPos) => {
-            const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
-            int[prop] = new Knob({
-                min: min, max: max, value: val, sensitivity: 0.1,
-                style: { w: 60, h: 60, knobColor: '#ffcc00', trackColor: '#222' }
-            });
-            container.add(int[prop]);
-            container.add(new Node({ 
-                value: label, 
-                style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: '#ffcc00', weight: 'bold' } 
-            }));
-            return container;
-        };
+        container.add(int[prop]);
+        container.add(new Node({ 
+            value: label, 
+            style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: '#ffcc00', weight: 'bold' } 
+        }));
+        return container;
+    };
 
-        panel.add(createKnob("ECHO VOL", "echoVol", 0, 1, 0.5, "20px"));
-        panel.add(createKnob("DELAY", "echoDelay", 0.01, 1, 0.3, "120px"));
-        panel.add(createKnob("FEEDBACK", "echoFb", 0, 0.9, 0.4, "220px"));
+    panel.add(createKnob("ECHO VOL", "echoVol", 0, 1, 0.5, "20px"));
+    panel.add(createKnob("DELAY", "echoDelay", 0.01, 1, 0.3, "120px"));
+    panel.add(createKnob("FEEDBACK", "echoFb", 0, 0.9, 0.4, "220px"));
 
-        const visualizer = new CanvasNode({
-            style: { w: "100%", h: 150, bg: "#000", rad: 5, t: 130 },
-            onDraw: (c, w, h) => {
-                const vol = int.echoVol?.val ?? 0;
-                const fb = int.echoFb?.val ?? 0;
-                const delay = int.echoDelay?.val ?? 0;
-                
-                c.strokeStyle = "#ffcc00";
-                c.lineWidth = 2;
-                let x = 20;
-                let amp = h * 0.8 * vol;
-                
-                for(let i=0; i<50; i++) {
-                    c.beginPath();
-                    c.moveTo(x, h/2 - amp/2);
-                    c.lineTo(x, h/2 + amp/2);
-                    c.stroke();
-                    x += delay * 100;
-                    amp *= fb;
-                    if(amp < 2) break;
-                }
+    const visualizer = new CanvasNode({
+        style: { w: "100%", h: 150, bg: "#000", rad: 5, t: 130 },
+        onDraw: (c, w, h) => {
+            const vol = int.echoVol?.val ?? 0;
+            const fb = int.echoFb?.val ?? 0;
+            const delay = int.echoDelay?.val ?? 0;
+            
+            c.strokeStyle = "#ffcc00";
+            c.lineWidth = 2;
+            let x = 20;
+            let amp = h * 0.8 * vol;
+            
+            for(let i=0; i<50; i++) {
+                c.beginPath();
+                c.moveTo(x, h/2 - amp/2);
+                c.lineTo(x, h/2 + amp/2);
+                c.stroke();
+                x += delay * 100;
+                amp *= fb;
+                if(amp < 2) break;
             }
-        });
-        panel.add(visualizer);
-        modal.add(panel);
-        globalRoot.add(modal);
+        }
+    });
+    panel.add(visualizer);
+    modal.add(panel);
+    globalRoot.add(modal);
     `,
-	process: `
+    process: `
         const sr = audioCtx.sampleRate;
         if (!fx.echoBufferL) {
             fx.echoBufferL = new Float32Array(sr * 2);
@@ -577,20 +574,19 @@ if(fx.time>fx.duration){
             fx.echoPos = 0;
             fx.silenceFrames = 0; 
         }
-        const vol = int.echoVol?.val * (fx.automation?.power ?? 1) ?? 0.5;
-        const delayTime = int.echoDelay?.val ?? 0.3;
-        const fb = int.echoFb?.val ?? 0.4;
+        const vol = fx.automation["Echo Vol"] ?? int.echoVol?.val ?? 0.5;
+        const delayTime = fx.automation["Echo Delay"] ?? int.echoDelay?.val ?? 0.3;
+        const fb = fx.automation["Echo Feedback"] ?? int.echoFb?.val ?? 0.4;
+
         if (!fx.echoBufferL || fx.echoBufferL.length === 0) return;
+
         const delaySamples = Math.floor(delayTime * sr);
         const readPos = (fx.echoPos - delaySamples + fx.echoBufferL.length) % fx.echoBufferL.length;
-
         const echoL = fx.echoBufferL[readPos];
         const echoR = fx.echoBufferR[readPos];
-
         fx.echoBufferL[fx.echoPos] = fx.inL + echoL * fb;
         fx.echoBufferR[fx.echoPos] = fx.inR + echoR * fb;
         fx.echoPos = (fx.echoPos + 1) % fx.echoBufferL.length;
-
         fx.outL = fx.inL + echoL * vol;
         fx.outR = fx.inR + echoR * vol;
         const threshold = 0.0001;
@@ -602,6 +598,42 @@ if(fx.time>fx.duration){
         fx.isTailActive = (fx.silenceFrames < sr * 0.5);
     `
 }
+,
+"pitchshift volume": {
+  "interface": `
+    int.automations = { 
+        "pitch shift": { min: -12, max: 12, step: 1, defpoint: 0 },
+        "volume": { min: 0, max: 2, step: 0.01, defpoint: 1 }
+    };
+    const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'#05060a' }});
+    
+    const shiftKnob = new Knob({ 
+        min:-12, max:12, value:0, step:1, 
+        style:{ pos:'abs', t:50, l:50, w:80, h:80, knobColor:'#00ffaa' } 
+    });
+    int.shift = shiftKnob;
+    
+    const volKnob = new Knob({
+        min:0, max:2, value:1, step:0.01, 
+        style:{ pos:'abs', t:50, l:150, w:80, h:80, knobColor:'#ffaa00' }
+    });
+    int.volume = volKnob;
+
+    modal.add(shiftKnob);
+    modal.add(volKnob);
+    globalRoot.add(modal);
+  `,
+  "process": `
+    const shiftSteps = fx.automation["pitch shift"] ?? int.shift?.val ?? 0;
+    const vol = fx.automation?.volume ?? int.volume?.val ?? 1;
+    const shiftFactor = Math.pow(2, shiftSteps / 12);
+    
+    fx.outL = fx.inL * vol;
+    fx.outR = fx.inR * vol;
+    fx.shiftfreq = shiftFactor;
+  `
+}
+
 }
  
 window.Effects["gain_and_limiter"] = {
@@ -612,7 +644,7 @@ int.automations = {
  "limit": { min: 0, max: 1, step: 0.01, defpoint: 0.9 }
 };
 const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'#120000' }});
-const panel = new Node({ style:{ pos:'abs', t:'10%', l:'10%', w:'80%', h:'200px', bg:'#220000', pad:20, rad:10 }});
+const panel = new Node({ style:{ pos:'abs', t:'10%', l:'10%', w:'80%', h:'calc(90% - 70px)', bg:'#220000', pad:20, rad:10 }});
 
 const addKnob = (label, prop, min, max, val, x) => {
  const c = new Node({ style:{ pos:'abs', l:x, t:10, w:80, h:120 }});
@@ -758,17 +790,21 @@ window.Instruments = {
         const gain = int?.gainKnob?.val ?? 3;
         const midiSet = synth.pattern?.playingMidi || new Set();
         const notes = Array.from(midiSet).sort((a, b) => a - b);
-        let freq = synth.notefreq;
-        synth.noChordProgression=false;
-        if (speedBeats > 0) {
-        synth.noChordProgression=true;
-            const bpm = synth.pattern?.bpm || 120;
-            synth.arpStep += (1 / sr) * ((bpm / 60) * speedBeats);
-            if (notes.length > 0) {
-                const idx = Math.floor(synth.arpStep) % notes.length;
-                freq = 440 * Math.pow(2, (notes[idx] - 69) / 12);
-            }
-        }
+        const shiftMult = synth.fxShiftFreq || 1.0;
+
+let freq = synth.notefreq*shiftMult;
+synth.noChordProgression = false;
+
+if (speedBeats > 0) {
+	synth.noChordProgression = true;
+	const bpm = synth.pattern?.bpm || 120;
+	synth.arpStep += (1 / sr) * ((bpm / 60) * speedBeats) ;
+	
+	if (notes.length > 0) {
+		const idx = Math.floor(synth.arpStep) % notes.length;
+		freq = (440 * Math.pow(2, (notes[idx] - 69) / 12)) * shiftMult;
+	}
+}
         synth.phase += freq / sr;
         if (synth.phase >= 1.0) synth.phase -= 1.0;
         const p = synth.phase;
@@ -813,129 +849,6 @@ window.Instruments = {
         synth.outR = final;
     `
 } ,
-"wave player": {
-    interface: `
-    int.saved = int.saved || {};
-    const modal = new Node({
-        style:{ pos:'abs', t:'0', l:'0', w:'100vw', h:'100vh', bg:'#111' }
-    });
-    const panel = new Node({
-        style:{ pos:'abs', t:'5%', l:'5%', w:'90%', h:'calc(90% - 70px)', bg:'#222', pad:20, rad:10, border:'1px solid #444' }
-    });
-    
-    const label = new Node({ value:"LOAD AUDIO FILE (MP3/WAV)", style:{ size:12, color:'#66aaff', mb:10, weight:'bold' }});
-    panel.add(label);
-
-    int.fileInput = new InputFile({
-        accept: "audio/*",
-        proxy: int,
-        style:{ w:250, h:35, bg:'#333', color:'#fff', rad:5 }
-    });
-    
-    int.fileInput.onChange = async (file) => {
-        try {
-            const arr = await file.arrayBuffer();
-            const decoded = await audioCtx.decodeAudioData(arr);
-            int.audioBuffer = decoded;  
-            label.value = "LOADED: " + file.name;
-        } catch (e) {
-            console.error("Load Error:", e);
-            label.value = "ERROR LOADING FILE";
-        }
-    };
-    panel.add(int.fileInput);
-    
-    const controls = new Node({ style: { w:'100%', h:150, mt:20 } });
-    
-    const addKnob = (name, prop, min, max, val, l) => {
-        const c = new Node({ style: { float:'left', w:80, h:120, ml:l } });
-        int[prop] = new Knob({
-            min: min, max: max, value: val,
-            style: { w:60, h:60, knobColor:'#66aaff', trackColor:'#111' }
-        });
-        c.add(int[prop]);
-        c.add(new Node({ value: name, style: { t:5, w:60, textAlign:'center', size:10, color:'#888' } }));
-        controls.add(c);
-    };
-
-    addKnob("ROOT", "rootKnob", 12, 108, 60, 0);
-    addKnob("VOL", "volKnob", 0, 2, 1, 10);
-    addKnob("PAN", "panSlider", -1, 1, 0, 10);
-    addKnob("EASE OUT", "easeOut", 0, 2.0, 0, 10); 
-
-    if (int.saved.loop === undefined) int.saved.loop = false;
-    const loopBtn = new Node({
-        value: int.saved.loop ? "MODE: LOOP" : "MODE: ONCE",
-        style: { float:'left', w:120, h:40, bg:'#333', color:'#fff', rad:5, ml:20, mt:10, textAlign:'center', lineHeight:'40px', cursor:'pointer' }
-    });
-    loopBtn.onClick = () => {
-        int.saved.loop = !int.saved.loop;
-        loopBtn.value = int.saved.loop ? "MODE: LOOP" : "MODE: ONCE";
-    };
-    controls.add(loopBtn);
-
-    panel.add(controls);
-    modal.add(panel);
-    globalRoot.add(modal);
-    `,
-    synth: `
-    if (!int.audioBuffer || !int.audioBuffer.left) return;
-
-    if (synth.playhead === undefined) synth.playhead = 0;
-    if (synth.time === undefined) synth.time = 0;
-
-    const dataL = int.audioBuffer.left;
-    const dataR = int.audioBuffer.right;
-    const len = dataL.length;
-    const sr = audioCtx.sampleRate;
-    
-    const root = int.rootKnob?.val ?? 60;
-    const vol = int.volKnob?.val ?? 1.0;
-    const easeOut = int.easeOut ? int.easeOut.val : 0;
-    
-    const ratio = Math.pow(2, (synth.noteNumber - root) / 12);
-    if (synth.playhead >= len - 1) {
-        if (int.saved?.loop) {
-            synth.playhead = 0;
-        } else {
-            synth.disconnect = true;
-            return;
-        }
-    }
-
-    let i0 = Math.floor(synth.playhead);
-    let i1 = i0 + 1 >= len ? i0 : i0 + 1;
-    let fract = synth.playhead - i0;
-    let sL = dataL[i0] + (dataL[i1] - dataL[i0]) * fract;
-    let sR = dataR[i0] + (dataR[i1] - dataR[i0]) * fract;
-
-    let env = 1;
-    if (synth.time > synth.duration) {
-        if (easeOut > 0) {
-            const releaseTime = synth.time - synth.duration;
-            env = Math.exp(-releaseTime * (1 / easeOut) * 5);
-        } else {
-            env = 0;
-        }
-    } else if (synth.time > synth.duration - 0.02) {
-        if (easeOut <= 0) {
-            env = Math.max(0, (synth.duration - synth.time) / 0.02);
-        }
-    }
-
-    const pan = int.panSlider?.val ?? 0;
-    const final = env * vol * 0.7;
-    synth.outL = sL * final * Math.min(1, 1 - pan);
-    synth.outR = sR * final * Math.min(1, 1 + pan);
-
-    synth.playhead += ratio;
-    synth.time += 1 / sr;
-    const isFinished = (easeOut > 0) ? (env < 0.001) : (synth.time >= synth.duration);
-    if (isFinished && !int.saved?.loop) {
-        synth.disconnect = true;
-    }
-    `
-},
 "wave player": {
 	interface: `
     int.saved = int.saved || {};
@@ -986,14 +899,14 @@ window.Instruments = {
     addKnob("PAN", "panSlider", -1, 1, 0, 10);
     addKnob("EASE OUT", "easeOut", 0, 2.0, 0, 10); 
 
-    if (int.saved.loop === undefined) int.saved.loop = false;
+    if (int.loop === undefined) int.loop = false;
     const loopBtn = new Node({
-        value: int.saved.loop ? "MODE: LOOP" : "MODE: ONCE",
+        value: int.loop ? "MODE: LOOP" : "MODE: ONCE",
         style: { float:'left', w:120, h:40, bg:'#333', color:'#fff', rad:5, ml:20, mt:10, textAlign:'center', lineHeight:'40px', cursor:'pointer' }
     });
     loopBtn.onClick = () => {
-        int.saved.loop = !int.saved.loop;
-        loopBtn.value = int.saved.loop ? "MODE: LOOP" : "MODE: ONCE";
+        int.loop = !int.loop;
+        loopBtn.value = int.loop ? "MODE: LOOP" : "MODE: ONCE";
     };
     controls.add(loopBtn);
 
@@ -1018,7 +931,7 @@ window.Instruments = {
     
     const ratio = Math.pow(2, (synth.noteNumber - root) / 12);
     if (synth.playhead >= len - 1) {
-        if (int.saved?.loop) {
+        if (int?.loop) {
             synth.playhead = 0;
         } else {
             synth.disconnect = true;
@@ -1054,7 +967,7 @@ window.Instruments = {
     synth.playhead += ratio;
     synth.time += 1 / sr;
     const isFinished = (easeOut > 0) ? (env < 0.001) : (synth.time >= synth.duration);
-    if (isFinished && !int.saved?.loop) {
+    if (isFinished && !int?.loop) {
         synth.disconnect = true;
     }
     `

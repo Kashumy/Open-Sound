@@ -3,7 +3,7 @@
   ▙▌▌ ▄▌  ▙▌▌ ▙▖▌▝▌  ▄▌▙▌▙▌▌▝▌▙▘
   EDITOR                            */
 /* ************* */
-VERSION = 1.5
+VERSION = 1.55
 /* ************* */
 let fileInput = document.getElementById('fileInput');
 let activeInput = null; let UpPoint=0
@@ -12,6 +12,7 @@ let settings = {
 	songVolume:1,
 	interfaceScale:1,
 	dpi:1,
+	cleanPatterns:false,
 }
 const buildInThemes = {
 "Dark": {
@@ -1765,7 +1766,7 @@ function openEffectUI(name, patternId, instanceIdx) {
     currentOpenedProxy = FXManager.init(name, patternId, instrumentInside, instanceIdx, "_fx_");
     instrumentBox.style.opacity = 1;
     instrumentNav.value = "Effect - " + name;
-    const version =  Instruments[name].version || "N/A";
+    const version =  Effects[name].version || "N/A";
     instrumentVersion.value = "VERSION: " + version;
     openedEffect=true
 }
@@ -1774,31 +1775,66 @@ function initializeEffectState(name, patternId, instanceIdx) {
 	FXManager.init(name, patternId, null, instanceIdx, "_fx_");
 }
 let menuCopy=null
-function renderAutomationMenu(track, localX, activeMenuX, originalId = null){
+function renderAutomationMenu(track, localX, activeMenuX, originalId = null) {
     activeMenu = null;
     menuBox.style.opacity = 0;
     instrumentPickBoxBg.style.opacity = 0.5;
-    instrumentPickBox.scroll.y=0;
+    instrumentPickBox.scroll.y = 0;
     instrumentPickBox.children = [];
-    const types = ["Instrument", "Effect"];
+    const types = ["Instrument", "Effect","Song Tempo"];
     types.forEach(type => {
         const row = new Node({
-        value: type.toUpperCase(),
-        style: { w: "100%", h: "40px", bg: theme.tracksBg, textleft: 10, color: "window(theme.textcolor)" }
+            value: type.toUpperCase(),
+            style: { w: "100%", h: "40px", bg: theme.tracksBg, textleft: 10, color: "window(theme.textcolor)" }
         });
         row.onClick = () => {
-        if (type === "Instrument") {
-        renderInstanceSelection(track, "instrument", localX,originalId);
-        } else {
-        renderInstanceSelection(track, "effect", localX,originalId);
-        }
+   if (type === "Song Tempo") {
+    instrumentBox.style.opacity = 1;
+    instrumentNav.value = "Automation: Song Tempo";
+    instrumentInside.children = [];
+    const container = new Node({ style: { w:"100vw",h:"100vh", pos:"abs",t:0,l:0, bg:"window(theme.editorBg)" } });
+    container.add(new Node({ value: "BPM MIN:", style: { color: "window(theme.textcolor)", h: "30px" } }));
+    const minInput = new Textarea({ value: "120", style: { w: "100%", h: "40px", bg: "#222", color: "window(theme.textcolor)", bg:"window(theme.boxcolor)" } });
+    container.add(minInput);
+    container.add(new Node({ value: "BPM MAX:", style: { color: "window(theme.textcolor)", h: "30px", t: "10px" } }));
+    const maxInput = new Textarea({ value: "160", style: { t:"15", w: "100%", h: "40px", bg: "#222", color: "window(theme.textcolor)", bg:"window(theme.boxcolor)" } });
+    container.add(maxInput);
+    const applyBtn = new Node({
+        value: "CREATE SONG TEMPO AUTOMATION",
+        style: { w: "100%", h: "50px", bg: "window(theme.done)", color: "window(theme.textcolor)", t: "20px", texttop: 15 }
+    });
+    applyBtn.onClick = () => {
+        const bMin = parseFloat(minInput.value) || 120;
+        const bMax = parseFloat(maxInput.value) || 160;
+        
+        const pat = patterns[originalId];
+        pat.name = "Tempo: " + bMin + "-" + bMax;
+        pat.associated = ["SONG", "BPM"]; 
+        pat.min = bMin;
+        pat.max = bMax;
+        
+        instrumentBox.style.opacity = 0;
+        instrumentPickBoxBg.style.opacity = 0;
+        draw();
+    };
+    
+    container.add(applyBtn);
+    instrumentInside.add(container);
+    instrumentPickBoxBg.style.opacity = 0; 
+}
+else if (type === "Instrument") {
+                renderInstanceSelection(track, "instrument", localX, originalId);
+            } else {
+                renderInstanceSelection(track, "effect", localX, originalId);
+            }
         };
         instrumentPickBox.add(row);
     });
 }
+
 function renderInstanceSelection(track, category, localX, originalId = null) {
     instrumentPickBox.children = [];
-    instrumentPickBox.scroll.y=0;
+    instrumentPickBox.scroll.y = 0;
     const states = category === "instrument" ? instrumentStates : effectStates;
     const suffix = category === "instrument" ? "_inst_" : "_fx_";
     Object.keys(states).forEach(key => {
@@ -1806,78 +1842,93 @@ function renderInstanceSelection(track, category, localX, originalId = null) {
         const name = parts[0];
         const idx = parseInt(parts[1]) + 1;
         const row = new Node({
-        value: `${name.toUpperCase()} (Inst ${idx})`,
-        style: { w: "100%", h: "40px", bg: theme.tracksBg, textleft: 10, color: "window(theme.textcolor)" }
+            value: `${name.toUpperCase()} (Inst ${idx})`,
+            style: { w: "100%", h: "40px", bg: theme.tracksBg, textleft: 10, color: "window(theme.textcolor)" }
         });
         row.onClick = () => {
-        renderParameterSelection(track, category, key, localX,originalId);
+            renderParameterSelection(track, category, key, localX, originalId);
         };
         instrumentPickBox.add(row);
     });
 }
+
 function renderParameterSelection(track, category, selectedStateKey, localX, originalId) {
-	instrumentPickBox.children = [];
-	instrumentPickBox.scroll.y=0;
-	const states = category === "instrument" ? instrumentStates : effectStates;
-	const suffix = category === "instrument" ? "_inst_" : "_fx_";
-	const pluginName = selectedStateKey.split(suffix)[0];
-	Object.keys(states)
-		.filter(key => key.startsWith(pluginName + suffix))
-		.forEach(stateKey => {
-			const state = states[stateKey];
-			const automations = state?.automations || {};
-			Object.keys(automations).forEach(paramKey => {
-				const config = automations[paramKey];
-				const parts = stateKey.split(suffix);
-				const instIdx = parseInt(parts[1]) + 1;
-				const row = new Node({
-					value: `${paramKey.toUpperCase()} (${instIdx})`,
-					style: {
-						w: "100%",
-						h: "40px",
-						bg: theme.tracksBg,
-						textleft: 10,
-						color: "window(theme.textcolor)"
-					}
-				});
-				row.onClick = () => {
-					const min = config.min ?? 0;
-					const max = config.max ?? 1;
-					const step = config.step ?? 0.01;
-					if (originalId && patterns[originalId]) {
-						const pat = patterns[originalId];
-						const oldMin = pat.min ?? 0;
-						const oldMax = pat.max ?? 1;
-						if (pat.points.length === 1 && config.defPoint !== undefined) {
-							const normalized = (config.defPoint - min) / (max - min);
-							pat.points = [{
-								x: pat.points[0].x,
-								y: clamp(normalized, 0, 1)
-							}];
-						} else {
-						pat.points = pat.points.map(pt => {
-						const realValue = oldMin + pt.y * (oldMax - oldMin);
-						const normalized = (realValue - min) / (max - min);
-						return {
-						x: pt.x,
-						y: clamp(normalized, 0, 1)
-						};
-						});
-      }
-						pat.associated = [pluginName, stateKey, paramKey];
-						pat.min = min;
-						pat.max = max;
-						pat.step = step;
-						pat.category = category === "instrument" ? "inst" : "fx";
-						pat.name = `${paramKey.toUpperCase()} Clip`;
-					}
-					instrumentPickBoxBg.style.opacity = 0;
-					draw();
-				};
-				instrumentPickBox.add(row);
-			});
-		});
+    instrumentPickBox.children = [];
+    instrumentPickBox.scroll.y = 0;
+    const suffix = category === "instrument" ? "_inst_" : "_fx_";
+    const parts = selectedStateKey.split(suffix);
+    const pluginName = parts[0];
+    const instIdx = parseInt(parts[1]);
+
+    const proxy = getCachedProxy(category, pluginName, instIdx, suffix);
+    const source = category === "instrument" ? window.Instruments[pluginName] : window.Effects[pluginName];
+
+    if (!proxy.automations && source && source.interface) {
+        try {
+            const uiCode = new Function("int", "audioCtx", "globalRoot", "Node", "Knob", "CanvasNode", source.interface);
+            uiCode(proxy, audioCtx, null, Node, Knob, null);
+        } catch (e) {}
+    }
+
+    const automations = proxy.automations || {};
+    Object.keys(automations).forEach(paramKey => {
+        const config = automations[paramKey];
+        const row = new Node({
+            value: paramKey.toUpperCase(),
+            style: {
+                w: "100%",
+                h: "40px",
+                bg: theme.tracksBg,
+                textleft: 10,
+                color: "window(theme.textcolor)"
+            }
+        });
+        row.onClick = () => {
+            const min = config.min ?? 0;
+            const max = config.max ?? 1;
+            const step = config.step ?? 0.01;
+
+            if (originalId && patterns[originalId]) {
+                const pat = patterns[originalId];
+                const oldMin = pat.min ?? 0;
+                const oldMax = pat.max ?? 1;
+
+                pat.points = pat.points.map(pt => {
+                    const realValue = oldMin + pt.y * (oldMax - oldMin);
+                    const normalized = (realValue - min) / (max - min);
+                    return {
+                        x: pt.x,
+                        y: Math.max(0, Math.min(1, normalized))
+                    };
+                });
+
+                pat.associated = category === "instrument" ? [pluginName, selectedStateKey, paramKey] : [selectedStateKey, paramKey];
+                pat.min = min;
+                pat.max = max;
+                pat.step = step;
+                pat.category = category === "instrument" ? "inst" : "fx";
+                pat.name = `${paramKey.toUpperCase()} Clip`;
+            } else {
+                const patId = "pat_" + Date.now();
+                patterns[patId] = {
+                    type: "mod",
+                    category: category === "instrument" ? "inst" : "fx",
+                    associated: category === "instrument" ? [pluginName, selectedStateKey, paramKey] : [selectedStateKey, paramKey],
+                    points: [{ x: 0, y: 0.5 }, { x: 16, y: 0.5 }],
+                    min: min,
+                    max: max,
+                    step: step,
+                    name: paramKey.toUpperCase()
+                };
+                track.patterns.push([localX, 16, patId]);
+            }
+            instrumentPickBoxBg.style.opacity = 0;
+            draw();
+        };
+        instrumentPickBox.add(row);
+    });
 }
+
 let WheelDAWDisabled=0
 function draw() {
 	window.NavH=45*settings.interfaceScale
@@ -2599,6 +2650,25 @@ const dpiSlider = new Slider({
 volumeRow.add(dpiLabel);
 volumeRow.add(dpiSlider);
 		menuBox.add(volumeRow);
+const cleanPatLabel = new Node({
+			value: "Clean Patterns",
+			style: { float: "left", w: "120px", h: "40px", texttop: 10 ,color:"window(theme.textcolor)"}
+		});
+const pattSelect = new Node({
+	value: "Empty",
+	style: {float:"left", w: "auto", h: "40px", bg: theme.tracksBg, color: "window(theme.textcolor)", textleft: 10  },
+	onClick: (el) => {
+		activeMenu = {
+			type: "select",
+			opts: [["True",()=>{settings.cleanPatterns=true; saveSettings() }], ["False",()=>{settings.cleanPatterns=false; saveSettings() }]]
+		};
+		menuBox.scroll.y = 0;draw()
+	}
+});
+pattSelect.value=settings.cleanPatterns?"True":"False"
+		outputRow.add(cleanPatLabel);
+		outputRow.add(pattSelect);
+		
 		menuBox.style.opacity = 1;
 		menuBoxBg.style.opacity = 0.5;
 		activeMenu=null
@@ -4770,7 +4840,7 @@ if ((isSelecting || pMode === "move"|| pMode === "resize" ) && !isPlaying) {
 	const now = performance.now();
  deltaSec = (now - lastFrameTime) / 1000;
 	lastFrameTime = now;
-	globalOpacityForPatterBg=isPlaying
+	globalOpacityForPatterBg=isPlaying || settings.cleanPatterns
 	if (isPlaying && anabledScroll) {
 		const beatsPerSec = BPM / 60;
 		const stepsPerBeat = STEPS_PER_BAR / 4;

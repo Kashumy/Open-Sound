@@ -235,11 +235,12 @@ function importProject(txt) {
         saved: data.saved ? JSON.parse(JSON.stringify(data.saved)) : {}
         };
         if (data.audioData) {
-        const arr = new Float32Array(data.audioData);
-        const buf = audioCtx.createBuffer(1, arr.length, data.sampleRate || audioCtx.sampleRate);
-        buf.copyToChannel(arr, 0);
-        instrumentStates[key].audioBuffer = buf;
-        }
+	const arr = new Float32Array(data.audioData);
+	const buf = audioCtx.createBuffer(2, arr.length, data.sampleRate || audioCtx.sampleRate);
+	buf.copyToChannel(arr, 0);
+	buf.copyToChannel(arr, 0); 
+	instrumentStates[key].audioBuffer = buf;
+}
         });
         Object.keys(effectStates).forEach(k => delete effectStates[k]);
         const savedFX = obj.effectStates || {};

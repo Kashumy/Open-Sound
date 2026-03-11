@@ -133,6 +133,23 @@ this.activeSynths.push(v);
         }
         }
         const instanceBuckets = new Map();
+const instanceShiftMultipliers = new Map();
+for (const [stateKey, fxData] of this.persistentFXStates) {
+	let multiplier = 1.0;
+	if (fxData.fxChain) {
+		for (const ef of fxData.fxChain) {
+			ef.state.inL = 0;
+			ef.state.inR = 0;
+			ef.state.automation = this.globalAutomationValues[ef.id] || {};
+			ef.compiled(ef.state, ef.proxy, mockCtx);
+			
+			if (ef.state.shiftfreq !== undefined) {
+				multiplier *= ef.state.shiftfreq;
+			}
+		}
+	}
+	instanceShiftMultipliers.set(stateKey, multiplier);
+}
         let finalL = 0;
         let finalR = 0;
         for (let j = this.activeSynths.length - 1; j >= 0; j--) {
@@ -141,9 +158,12 @@ this.activeSynths.push(v);
         if (!instanceBuckets.has(v.stateKey)) {
         instanceBuckets.set(v.stateKey, { l: 0, r: 0 });
         }
-        if (this.globalAutomationValues[v.stateKey]) {
-        c.automation = { ...this.globalAutomationValues[v.stateKey] };
-        }
+        const currentMultiplier = instanceShiftMultipliers.get(v.stateKey) || 1.0;
+        const baseFreq = 440 * Math.pow(2, (c.noteNumber - 69) / 12);
+        c.notefreq = baseFreq ;
+        c.fxShiftFreq = currentMultiplier;
+        const autoValues = this.globalAutomationValues[v.instKey] || {};
+        c.automation = { ...v.proxy, ...autoValues };
         c.pattern = c.pattern || {};
         c.pattern.playingMidi = new Set(this.playingNotes[v.stateKey] || []);
         c.pattern.bpm = this.bpm;
