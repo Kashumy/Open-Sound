@@ -1,3 +1,4 @@
+
  const SavedLocalData = {
     set(key, value) {
         localStorage.setItem(key, JSON.stringify(value));
@@ -112,16 +113,29 @@ async function serializeInstrumentStates(states) {
 				
 				continue;
 			}
-			
-			if (prop === "audioBuffer") {
-				
-				newState.audioData = Array.from(st.audioBuffer.getChannelData(0));
-				newState.sampleRate = st.audioBuffer.sampleRate;
-				continue;
-			}
-			
+			if (prop === "audioBuffers") {
+ newState.audioBuffers = st.audioBuffers.map(buf => {
+  if (!buf) return null;
+  
+  return {
+   left: Array.from(buf.left),
+   right: Array.from(buf.right),
+   length: buf.length
+  };
+ });
+ continue;
+}
+if (prop === "audioBuffer") {
+ if (
+  st.audioBuffer &&
+  typeof st.audioBuffer.getChannelData === "function"
+ ) {
+  newState.audioData = Array.from(st.audioBuffer.getChannelData(0));
+  newState.sampleRate = st.audioBuffer.sampleRate;
+ }
+ continue;
+}
 			const val = st[prop];
-			
 			if (typeof val !== "object" || val === null) {
 				newState[prop] = val;
 			}
@@ -162,6 +176,7 @@ async function saveProjectToFile() {
         const a = document.createElement("a");
         a.href = url;
         a.download = "projekt_daw_" + Date.now() + ".ops";
+        installFile(blob,a.download,JSON.stringify(projectData),true)
         a.click();
         URL.revokeObjectURL(url);
     } catch (error) {
@@ -240,6 +255,17 @@ function importProject(txt) {
 	buf.copyToChannel(arr, 0);
 	buf.copyToChannel(arr, 0); 
 	instrumentStates[key].audioBuffer = buf;
+}
+if (data.audioBuffers) {
+ instrumentStates[key].audioBuffers = data.audioBuffers.map(b => {
+  if (!b) return null;
+  
+  return {
+   left: new Float32Array(b.left),
+   right: new Float32Array(b.right),
+   length: b.length
+  };
+ });
 }
         });
         Object.keys(effectStates).forEach(k => delete effectStates[k]);
@@ -524,6 +550,7 @@ function exportAsMID() {
     a.href = url;
     a.download = `MIDI${Date.now()}.mid`;
     document.body.appendChild(a);
+    installFile(blob,a.download)
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);

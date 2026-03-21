@@ -1,3 +1,28 @@
+function blobToBase64(blob) {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			const base64data = reader.result.split(',')[1];
+			resolve(base64data);
+		};
+		reader.onerror = reject;
+		reader.readAsDataURL(blob);
+	});
+}
+function installFile(blob, name, text="", jsontype=false) {
+   if (location.href.startsWith("file:///")) {
+   if (jsontype) {
+   NativeJava.DownloadText((text), name);
+   } else {
+   try {
+   blobToBase64(blob).then(base64data => { 
+    NativeJava.DownloadFile(base64data, name);
+   });
+   }catch (e) { NativeJava.showToast(e) }
+  }
+}
+}
+
 let caretDisable=false
 		let c = document.getElementById('c'),
 	ctx = c.getContext('2d');
@@ -103,6 +128,7 @@ let PointedNode;
 					"borderColor": p.style?.borderColor || '#444',
 					"float": p.style?.float || 'none',
 					"opacity": p.style?.opacity ?? 1,
+					"display": p.style?.display ?? "block",
 					"textleft": p.style?.textleft ?? 10,
 					"texttop": p.style?.texttop ?? 10
 				};
@@ -187,10 +213,12 @@ update(px, py, pw, ph) {
         const offY = (s.ovy !== 'vis') ? -this.scroll.y : 0;
         let childW = (c.style.w === 'auto') ? measureText(c.value, `${c.style.size}px Arial`) : getV(c.style.w, availableW);
         if (c.style.float === 'left') {
-        if (cursorX + childW > layoutLimitW && cursorX > 0) {
+        if (cursorX + childW > layoutLimitW) { 
+        if (cursorX > 0) { 
         cursorX = 0;
         cursorY += currentLineHeight + 5;
         currentLineHeight = 0;
+         }
         }
         c.update(this.box.x + pad + cursorX + offX, this.box.y + pad + cursorY + offY, availableW, ph);
         cursorX += c.box.w + 5;
@@ -208,7 +236,7 @@ update(px, py, pw, ph) {
         maxContentH = Math.max(maxContentH, cursorY + currentLineHeight);
     });
     this.contentW = maxContentW;
-    this.contentH = maxContentH;
+    this.contentH = Math.max(maxContentH, cursorY + currentLineHeight); 
     if (s.h === 'auto') {
         this.box.h = this.contentH + (pad * 2);
     }
@@ -216,6 +244,7 @@ update(px, py, pw, ph) {
 			draw() {
  const s = this.style;
  if (s.opacity <= 0) return;
+ if (s.display == "none") return;
 				const { x, y, w, h } = this.box;
 				ctx.save();
 				ctx.globalAlpha = s.opacity;
@@ -290,6 +319,7 @@ if (activeEl === this) {
 }
 			findTarget(mx, my) {
  if (this.style.opacity <= 0) return null;
+ if (this.style.display == "none") return null;
 				if ((this.style.ovx !== 'vis' || this.style.ovy !== 'vis') &&
 					(mx < this.box.x || mx > this.box.x + this.box.w || my < this.box.y || my > this.box.y + this.box.h)) {
 					return null;
@@ -440,10 +470,10 @@ class Knob extends Node {
   ctx.globalAlpha = s.opacity;
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  ctx.fillStyle = s.trackColor;
+  ctx.fillStyle = this.resolveStyle(s.trackColor)  
   ctx.fill();
   if (s.border > 0) {
-   ctx.strokeStyle = s.borderColor;
+   ctx.strokeStyle = this.resolveStyle(s.borderColor);
    ctx.lineWidth = s.border;
    ctx.stroke();
   }
@@ -456,7 +486,7 @@ class Knob extends Node {
   ctx.beginPath();
   ctx.lineCap = "round";
   ctx.lineWidth = 4;
-  ctx.strokeStyle = s.knobColor;
+  ctx.strokeStyle = this.resolveStyle(s.knobColor);
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(
    centerX + Math.cos(currentAngle) * radius,
@@ -465,11 +495,11 @@ class Knob extends Node {
   ctx.stroke();
   if (this.isMoving) {
    ctx.globalAlpha = 0.5;
-   ctx.fillStyle = "#fff";
+   ctx.fillStyle = this.resolveStyle(s.knobColor)  
    ctx.font = "10px Arial";
    ctx.textAlign = "center";
    ctx.fillText(
-    Math.round(this._val),
+     this._val.toFixed(3),
     centerX,
     centerY + radius + 12
    );
@@ -487,7 +517,7 @@ class InputFile extends Node {
         style: {
         w: p.style?.w || 150, h: p.style?.h || 30,
         bg: p.style?.bg || "#444", color: p.style?.color || "#fff",
-        rad: p.style?.rad || 4, pad: p.style?.pad || 5, ...p.style
+        rad: p.style?.rad || 4, pad: p.style?.pad || 5, ...p.style,
         }
         });
         this.accept = p.accept || "*/*";
@@ -770,82 +800,99 @@ function findScrollableParent(node, axis = 'y') {
 }
 let lastX,lastY
 let draggingCanvas = null;
+
+
 function setupEventListeners() {
     c.addEventListener('pointerdown', e => {
         isDown = true;
         downX = lastX = e.clientX;
         downY = lastY = e.clientY;
-        downTime = performance.now();
         const target = root.findTarget(e.clientX, e.clientY);
         if (target && (target.type === 'input' || target.type === 'textarea')) {
-	       caretDisable = false;
+            caretDisable = false;
+            activeEl = target;
         } else {
-       	caretDisable = true;
-       	activeEl = null; 
+            caretDisable = true;
+            activeEl = null;
         }
-        if (target instanceof Slider) { draggingSlider = target; }
-        else if (target instanceof Knob) { draggingKnob = target; }
+        if (target instanceof Slider) draggingSlider = target;
+        else if (target instanceof Knob) draggingKnob = target;
         else if (target instanceof CanvasNode) {
-        draggingCanvas = target;
-        draggingCanvas.handleEvent(e, e.clientX, e.clientY);
+            draggingCanvas = target;
+            draggingCanvas.handleEvent(e, e.clientX, e.clientY);
         }
     });
+
     c.addEventListener('pointermove', e => {
         const dx = e.clientX - lastX;
         const dy = e.clientY - lastY;
         if (draggingKnob) {
-        draggingKnob.isMoving = true;
-        draggingKnob.updateValue(-dx);
+            draggingKnob.isMoving = true;
+            draggingKnob.updateValue(-dx);
         } else if (draggingSlider) {
-        draggingSlider.isMoving = true;
-        draggingSlider.updateValue(e.clientX);
+            draggingSlider.isMoving = true;
+            draggingSlider.updateValue(e.clientX);
         } else if (draggingCanvas) {
-        draggingCanvas.handleEvent(e, e.clientX, e.clientY);
-        } else {
-        const target = root.findTarget(e.clientX, e.clientY);
-        const scrollableY = findScrollableParent(target, 'y');
-        if (scrollableY) {
-        	const limitY = Math.max(0, scrollableY.contentH - scrollableY.box.h);
-	if (limitY > 0) scrollableY.scroll.y = Math.max(0, Math.min(limitY, scrollableY.scroll.y - dy));
-}
-const scrollableX = findScrollableParent(target, 'x');
-if (scrollableX) {
-	const limitX = Math.max(0, scrollableX.contentW - scrollableX.box.w);
-	if (limitX > 0) scrollableX.scroll.x = Math.max(0, Math.min(limitX, scrollableX.scroll.x - dx));
-}
+            draggingCanvas.handleEvent(e, e.clientX, e.clientY);
+        } else if (isDown) {
+            const target = root.findTarget(e.clientX, e.clientY);
+            const scrollableY = findScrollableParent(target, 'y');
+            if (scrollableY) {
+                const limitY = Math.max(0, scrollableY.contentH - scrollableY.box.h + (getV(scrollableY.style.pad, scrollableY.box.w) * 2));
+                if (limitY > 0) scrollableY.scroll.y = Math.max(0, Math.min(limitY, scrollableY.scroll.y - dy));
+            }
+            const scrollableX = findScrollableParent(target, 'x');
+            if (scrollableX) {
+                const limitX = Math.max(0, scrollableX.contentW - scrollableX.box.w + (getV(scrollableX.style.pad, scrollableX.box.w) * 2));
+                if (limitX > 0) scrollableX.scroll.x = Math.max(0, Math.min(limitX, scrollableX.scroll.x - dx));
+            }
         }
         lastX = e.clientX;
         lastY = e.clientY;
+        render();
     });
-    c.addEventListener('pointerup', (e) => {
+
+    c.addEventListener('pointerup', e => {
         isDown = false;
         if (draggingKnob) draggingKnob.isMoving = false;
-        if (draggingCanvas) {
-        draggingCanvas.handleEvent(e, e.clientX, e.clientY);
-        }
-        draggingKnob = null;
-        draggingSlider = null;
-        draggingCanvas = null;
+        if (draggingCanvas) draggingCanvas.handleEvent(e, e.clientX, e.clientY);
+        draggingKnob = draggingSlider = draggingCanvas = null;
+        render();
     });
- 
-c.addEventListener('wheel', e => {
-    e.preventDefault(); 
-    const target = root.findTarget(e.clientX, e.clientY);
-    if (!target) return;
-    if (target instanceof Knob) {
-    	e.stopPropagation()
-        target.updateValue(e.deltaY * target.sensitivity);
+
+    c.addEventListener('wheel', e => {
+        e.preventDefault();
+        const target = root.findTarget(e.clientX, e.clientY);
+        if (!target) return;
+        if (target instanceof Knob) {
+            e.stopPropagation();
+            draggingKnob = target;
+            draggingKnob.isMoving = true;
+            target.updateValue(e.deltaY * target.sensitivity);
+            render(); 
+            setTimeout(function (){ if(draggingKnob && draggingKnob!==null){draggingKnob.isMoving=false};draggingKnob=null; },200)
+            return;
+        }
+        const scrollable = findScrollableParent(target, 'y');
+        if (scrollable) {
+            const limitY = Math.max(0, scrollable.contentH - scrollable.box.h + (getV(scrollable.style.pad, scrollable.box.w) * 2));
+            e.stopPropagation();
+            scrollable.scroll.y = Math.max(0, Math.min(limitY, scrollable.scroll.y + e.deltaY));
+            render();
+        }
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+        root.update(0, 0, window.innerWidth, window.innerHeight);
+        const checkResets = (node) => {
+            const pad = getV(node.style.pad, node.box.w);
+            if (node.contentH <= node.box.h - (pad * 2)) node.scroll.y = 0;
+            if (node.contentW <= node.box.w - (pad * 2)) node.scroll.x = 0;
+            node.children.forEach(checkResets);
+        };
+        checkResets(root);
         render();
-        return;
-    }
- 
-    const scrollable = findScrollableParent(target, 'y');
-    if (scrollable) {
-        const limitY = Math.max(0, scrollable.contentH - scrollable.box.h);
-        e.stopPropagation()
-        scrollable.scroll.y = Math.max(0, Math.min(limitY, scrollable.scroll.y + e.deltaY));
-        render();
-    }
-}, { passive: false });
-window.addEventListener('resize', render);
+    });
 }
+
+ 

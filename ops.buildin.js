@@ -1,3 +1,4 @@
+
 window.Effects = {
 "fdn_reverb": {
 	interface: `
@@ -6,25 +7,18 @@ int.automations = {
  "feedback": { min: 0, max: 0.99, step: 0.01, defpoint: 0.6 },
  "damp": { min: 0, max: 1, step: 0.01, defpoint: 0.3 }
 };
-
 const modal = new Node({
- style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'#05060a' }
+ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'window(theme.editorBg)' }
 });
-
-const knobWidth = 90;
-const spacing = 140;
-const totalWidth = spacing * 2; 
-centerX = (window.innerWidth * 0.25
-) - (totalWidth * 0.25);
+const knobWidth = 60;
 const centerY = 0;
-
-const createKnob = (label, prop, min, max, val, offsetX) => {
+const createKnob = (label, prop, min, max, val) => {
  const wrap = new Node({
   style:{
-   pos:'abs',
-   l: centerX + offsetX,
+   float:"left",
    t: centerY,
-   w: knobWidth,
+   l:0,
+   w: knobWidth+15,
    h: 130
   }
  });
@@ -33,18 +27,17 @@ const createKnob = (label, prop, min, max, val, offsetX) => {
   style:{
    w:knobWidth,
    h:knobWidth,
-   knobColor:'#00ffaa',
-   trackColor:'#1a2030'
+   knobColor:'window(theme.done)',
+   trackColor:'window(theme.channelsColor)'
   }
  });
  int[prop] = knob;
  const labelNode = new Node({
   value:label,
   style:{
-   t:0,
-   w:'100%',
-   size:13,
-   color:'#00ffaa',
+   t:-6,
+   size:9,
+   color:'window(theme.textcolor)'
   }
  });
  wrap.add(knob);
@@ -52,28 +45,24 @@ const createKnob = (label, prop, min, max, val, offsetX) => {
  modal.add(wrap);
  return knob;
 };
- 
-int.wetKnob  = createKnob("WET","wet",0,1,0.4,0);
-int.fbKnob   = createKnob("FEEDBACK","feedback",0,0.99,0.4,spacing);
-int.dampKnob = createKnob("DAMP","damp",0,1,0.3,spacing*2);
-
+int.wetKnob=createKnob("WET","wet",0,1,0.4);
+int.fbKnob=createKnob("FEEDBACK","feedback",0,0.99,0.4);
+int.dampKnob=createKnob("DAMP","damp",0,1,0.3);
 globalRoot.add(modal);
-const updateFeedbackColor = ()=>{
- const v = int.feedback?.val ?? 0;
-
- if(v > 0.49){
+const updateFeedbackColor=()=>{
+ const v=int.feedback?.val??0;
+ if(v>0.49){
   int.fbKnob.style.knobColor = '#ff3333';
-  int.fbKnob.style.trackColor = '#401010';
+  int.fbKnob.style.trackColor = '#a01010';
  }else{
-  int.fbKnob.style.knobColor = '#00ffaa';
-  int.fbKnob.style.trackColor = '#1a2030';
+  int.fbKnob.style.knobColor='window(theme.done)';
+  int.fbKnob.style.trackColor='window(theme.channelsColor)';
  }
 }
-const prevOnInput = int.fbKnob.onInput;
-
-int.fbKnob.onInput = (v) => {
-	if (prevOnInput) prevOnInput(v);
-	updateFeedbackColor();
+const prevOnInput=int.fbKnob.onInput;
+int.fbKnob.onInput=(v)=>{
+ if(prevOnInput)prevOnInput(v);
+ updateFeedbackColor();
 };
 updateFeedbackColor();
 `,
@@ -148,7 +137,7 @@ fx.isTailActive = (fx.silenceFrames < sr * 2.5);
 `
 }
 ,
-"eq_filter":{
+"eq_filter":{ 
 	interface: `
 const rebuildAutomations = () => {
  int.automations = {};
@@ -183,7 +172,7 @@ const rebuildAutomations = () => {
  });
 };
 const bgRoot = new Node({style:{pos:'abs',t:'0%',l:'0%',w:'100%',h:'100%',bg:'window(theme.editorBg)'}});
-const panel = new Node({style:{pos:'abs',t:'20%',l:'10%',w:'80%',h:'calc(90% - 70px)', bg:'window(theme.boxcolor)',rad:10,pad:10,border:'1px solid #333'}});
+const panel = new Node({style:{pos:'abs',t:'5%',l:'10%',w:'80%',h:'calc(90% - 70px)', bg:'window(theme.boxcolor)',rad:10,pad:10,border:'1px solid #333'}});
 bgRoot.add(panel);
 
 if (!int.points) int.points = [];
@@ -388,97 +377,83 @@ if(fx.time>fx.duration){
 ,
 "bitcrusher":{
 	interface: `
-	int.automations = {
-	"bitcrusher": { min: 0, max: 16, step: 1, defpoint: 1 },
-	"downsample": { min: 0, max: 40, step: 0.1, defpoint: 1 },
-	"wet": { min: 0, max: 1, step: 0.1, defpoint: 1 }
+int.automations = {
+ "bitcrusher": { min: 0, max: 16, step: 1, defpoint: 1 },
+ "downsample": { min: 0, max: 40, step: 0.1, defpoint: 1 },
+ "wet": { min: 0, max: 1, step: 0.1, defpoint: 1 }
 }
-        const modal = new Node({
-            style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#0a0505', rad: 0, ov: 'hid' }
-        });
-        const panel = new Node({
-            style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: '#1a0f0f', rad: 10, pad: 20, border: "1px solid #ff4444" }
-        });
-        
-        const createKnob = (label, prop, min, max, val, lPos, unit = "") => {
-            const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
-            
-            const valLabel = new Node({ 
-                value: val + unit, 
-                style: { t: "10px", w: '100%', textAlign: 'center', size: 11, color: '#fff', family: 'monospace' } 
-            });
-
-            int[prop] = new Knob({
-                min: min, max: max, value: val, sensitivity: 0.1,
-                style: { w: 60, h: 60, knobColor: '#ff4444', trackColor: '#331111' },
-                onInput: (v) => {
-                    valLabel.value = (prop === "bits" ? Math.round(v) : v.toFixed(1)) + unit;
-                }
-            });
-            container.add(int[prop]);
-            container.add(valLabel);
-            container.add(new Node({ 
-                value: label, 
-                style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: '#ff4444', weight: 'bold' } 
-            }));
-            return container;
-        };
-
-        panel.add(createKnob("BITS", "bits", 1, 16, 8, "20px", " bit"));
-        panel.add(createKnob("DOWNSAMP", "downsample", 1, 40, 1, "120px", "x"));
-        panel.add(createKnob("MIX", "wet", 0, 1, 1, "220px", " %"));
-
-        const visualizer = new CanvasNode({
-            style: { w: "100%", h: 150, bg: "#000", rad: 5, t: 130, border: "1px solid #ff444433" },
-            onDraw: (c, w, h) => {
-	const bits = Math.round(int.bits?.val ?? 8);
-	const ds = Math.max(1, int.downsample?.val ?? 1);
-	const wet = int.wet?.val ?? 1;
-	
-	c.clearRect(0, 0, w, h);
-	c.strokeStyle = "#ff4444";
-	c.lineWidth = 2;
-	c.beginPath();
-	
-	for (let x = 0; x < w; x++) {
-		let p = (x / w) * Math.PI * 4;
-		let drySig = Math.sin(p);
-		
-		let stepX = Math.floor(x / ds) * ds;
-		let pStep = (stepX / w) * Math.PI * 4;
-		let wetSig = Math.sin(pStep);
-		
-		let levels = Math.pow(2, bits);
-		wetSig = Math.round(wetSig * levels) / levels;
-		
-		let mixedSig = drySig * (1 - wet) + wetSig * wet;
-		let y = h / 2 + mixedSig * (h / 3);
-		
-		if (x === 0) c.moveTo(x, y);
-		else c.lineTo(x, y);
-	}
-	c.stroke();
-	c.fillStyle = "#ff4444";
-	c.font = "12px monospace";
-	c.textAlign = "left";
-	
-	c.fillText("BITS: " + bits, 10, 15);
-	c.fillText("LEVELS: " + Math.pow(2, bits), 10, 30);
-}
-        });
-
-        const updateLoop = () => {
-            if (modal.parent) {
-                visualizer.draw();
-                requestAnimationFrame(updateLoop);
-            }
-        };
-        updateLoop();
-
-        panel.add(visualizer);
-        modal.add(panel);
-        globalRoot.add(modal);
-    `,
+const modal = new Node({
+ style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: 'window(theme.editorBg)', rad: 0, ov: 'hid' }
+});
+const panel = new Node({
+ style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: 'window(theme.boxcolor)', rad: 10, pad: 20, border: "1px solid window(theme.done)" }
+});
+const createKnob = (label, prop, min, max, val, lPos, unit = "") => {
+ const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
+ const valLabel = new Node({ 
+  value: val + unit, 
+  style: { t: "10px", w: '100%', textAlign: 'center', size: 11, color: 'window(theme.textcolor)', family: 'monospace' } 
+ });
+ int[prop] = new Knob({
+  min: min, max: max, value: val, sensitivity: 0.1,
+  style: { w: 60, h: 60, knobColor: 'window(theme.done)', trackColor: 'window(theme.channelsColor)' },
+  onInput: (v) => {
+   valLabel.value = (prop === "bits" ? Math.round(v) : v.toFixed(1)) + unit;
+  }
+ });
+ container.add(int[prop]);
+ container.add(valLabel);
+ container.add(new Node({ 
+  value: label, 
+  style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: 'window(theme.done)', weight: 'bold' } 
+ }));
+ return container;
+};
+panel.add(createKnob("BITS","bits",1,16,8,"20px"," bit"));
+panel.add(createKnob("DOWNSAMP","downsample",1,40,1,"120px","x"));
+panel.add(createKnob("MIX","wet",0,1,1,"220px"," %"));
+const visualizer = new CanvasNode({
+ style: { w: "100%", h: 150, bg: "window(theme.editorBg)", rad: 5, t: 130, border: "1px solid window(theme.doneSoft)" },
+ onDraw: (c, w, h) => {
+  const bits = Math.round(int.bits?.val ?? 8);
+  const ds = Math.max(1, int.downsample?.val ?? 1);
+  const wet = int.wet?.val ?? 1;
+  c.clearRect(0, 0, w, h);
+  c.strokeStyle = theme.done;
+  c.lineWidth = 2;
+  c.beginPath();
+  for (let x = 0; x < w; x++) {
+   let p = (x / w) * Math.PI * 4;
+   let drySig = Math.sin(p);
+   let stepX = Math.floor(x / ds) * ds;
+   let pStep = (stepX / w) * Math.PI * 4;
+   let wetSig = Math.sin(pStep);
+   let levels = Math.pow(2, bits);
+   wetSig = Math.round(wetSig * levels) / levels;
+   let mixedSig = drySig * (1 - wet) + wetSig * wet;
+   let y = h / 2 + mixedSig * (h / 3);
+   if (x === 0) c.moveTo(x, y);
+   else c.lineTo(x, y);
+  }
+  c.stroke();
+  c.fillStyle = theme.done;
+  c.font = "12px monospace";
+  c.textAlign = "left";
+  c.fillText("BITS: " + bits, 10, 15);
+  c.fillText("LEVELS: " + Math.pow(2, bits), 10, 30);
+ }
+});
+const updateLoop = () => {
+ if (modal.parent) {
+  visualizer.draw();
+  requestAnimationFrame(updateLoop);
+ }
+};
+updateLoop();
+panel.add(visualizer);
+modal.add(panel);
+globalRoot.add(modal);
+`,
 	process: `
         if (fx.phaser === undefined) fx.phaser = 0;
         if (fx.lastL === undefined) fx.lastL = 0;
@@ -509,63 +484,58 @@ if(fx.time>fx.duration){
 },
 "Echo": {
     interface: `
-    int.automations = {
-        "Echo Vol": { min: 0, max: 1, step: 0.01, defpoint: 0.5 },
-        "Echo Delay": { min: 0.01, max: 1, step: 0.01, defpoint: 0.3 },
-        "Echo Feedback": { min: 0, max: 0.9, step: 0.01, defpoint: 0.4 }
-    };
-    const modal = new Node({
-        style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#08080c', rad: 0, ov: 'hid' }
-    });
-    const panel = new Node({
-        style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: '#14141d', rad: 10, pad: 20, border: "1px solid #333" }
-    });
-    
-    const createKnob = (label, prop, min, max, val, lPos) => {
-        const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
-        int[prop] = new Knob({
-            min: min, max: max, value: val, sensitivity: 0.1,
-            style: { w: 60, h: 60, knobColor: '#ffcc00', trackColor: '#222' }
-        });
-        container.add(int[prop]);
-        container.add(new Node({ 
-            value: label, 
-            style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: '#ffcc00', weight: 'bold' } 
-        }));
-        return container;
-    };
-
-    panel.add(createKnob("ECHO VOL", "echoVol", 0, 1, 0.5, "20px"));
-    panel.add(createKnob("DELAY", "echoDelay", 0.01, 1, 0.3, "120px"));
-    panel.add(createKnob("FEEDBACK", "echoFb", 0, 0.9, 0.4, "220px"));
-
-    const visualizer = new CanvasNode({
-        style: { w: "100%", h: 150, bg: "#000", rad: 5, t: 130 },
-        onDraw: (c, w, h) => {
-            const vol = int.echoVol?.val ?? 0;
-            const fb = int.echoFb?.val ?? 0;
-            const delay = int.echoDelay?.val ?? 0;
-            
-            c.strokeStyle = "#ffcc00";
-            c.lineWidth = 2;
-            let x = 20;
-            let amp = h * 0.8 * vol;
-            
-            for(let i=0; i<50; i++) {
-                c.beginPath();
-                c.moveTo(x, h/2 - amp/2);
-                c.lineTo(x, h/2 + amp/2);
-                c.stroke();
-                x += delay * 100;
-                amp *= fb;
-                if(amp < 2) break;
-            }
-        }
-    });
-    panel.add(visualizer);
-    modal.add(panel);
-    globalRoot.add(modal);
-    `,
+int.automations = {
+ "Echo Vol": { min: 0, max: 1, step: 0.01, defpoint: 0.5 },
+ "Echo Delay": { min: 0.01, max: 1, step: 0.01, defpoint: 0.3 },
+ "Echo Feedback": { min: 0, max: 0.9, step: 0.01, defpoint: 0.4 }
+};
+const modal = new Node({
+ style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: 'window(theme.editorBg)', rad: 0, ov: 'hid' }
+});
+const panel = new Node({
+ style: { pos: 'abs', t: '5%', l: '5%', w: '90%', h:'calc(90% - 70px)', bg: 'window(theme.boxcolor)', rad: 10, pad: 20, border: "1px solid window(theme.border)" }
+});
+const createKnob = (label, prop, min, max, val, lPos) => {
+ const container = new Node({ style: { pos: 'abs', l: lPos, t: 10, w: 80, h: 120 } });
+ int[prop] = new Knob({
+  min: min, max: max, value: val, sensitivity: 0.1,
+  style: { w: 60, h: 60, knobColor: 'window(theme.done)', trackColor: 'window(theme.channelsColor)' }
+ });
+ container.add(int[prop]);
+ container.add(new Node({ 
+  value: label, 
+  style: { t: 75, w: '100%', textAlign: 'center', size: 10, color: 'window(theme.done)', weight: 'bold' } 
+ }));
+ return container;
+};
+panel.add(createKnob("ECHO VOL","echoVol",0,1,0.5,"20px"));
+panel.add(createKnob("DELAY","echoDelay",0.01,1,0.3,"120px"));
+panel.add(createKnob("FEEDBACK","echoFb",0,0.9,0.4,"220px"));
+const visualizer = new CanvasNode({
+ style: { w: "100%", h: 150, bg: "window(theme.editorBg)", rad: 5, t: 130 },
+ onDraw: (c, w, h) => {
+  const vol = int.echoVol?.val ?? 0;
+  const fb = int.echoFb?.val ?? 0;
+  const delay = int.echoDelay?.val ?? 0;
+  c.strokeStyle = theme.done;
+  c.lineWidth = 2;
+  let x = 20;
+  let amp = h * 0.8 * vol;
+  for(let i=0;i<50;i++){
+   c.beginPath();
+   c.moveTo(x,h/2-amp/2);
+   c.lineTo(x,h/2+amp/2);
+   c.stroke();
+   x += delay * 100;
+   amp *= fb;
+   if(amp < 2) break;
+  }
+ }
+});
+panel.add(visualizer);
+modal.add(panel);
+globalRoot.add(modal);
+`,
     process: `
         const sr = audioCtx.sampleRate;
         if (!fx.echoBufferL) {
@@ -600,30 +570,27 @@ if(fx.time>fx.duration){
 }
 ,
 "pitchshift volume": {
-  "interface": `
-    int.automations = { 
-        "pitch shift": { min: -12, max: 12, step: 1, defpoint: 0 },
-        "volume": { min: 0, max: 2, step: 0.01, defpoint: 1 }
-    };
-    const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'#05060a' }});
-    
-    const shiftKnob = new Knob({ 
-        min:-12, max:12, value:0, step:1, 
-        style:{ pos:'abs', t:50, l:50, w:80, h:80, knobColor:'#00ffaa' } 
-    });
-    int.shift = shiftKnob;
-    
-    const volKnob = new Knob({
-        min:0, max:2, value:1, step:0.01, 
-        style:{ pos:'abs', t:50, l:150, w:80, h:80, knobColor:'#ffaa00' }
-    });
-    int.volume = volKnob;
-
-    modal.add(shiftKnob);
-    modal.add(volKnob);
-    globalRoot.add(modal);
-  `,
-  "process": `
+interface: `
+int.automations = { 
+ "pitch shift": { min: -12, max: 12, step: 1, defpoint: 0 },
+ "volume": { min: 0, max: 2, step: 0.01, defpoint: 1 }
+};
+const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'window(theme.editorBg)' }});
+const shiftKnob = new Knob({ 
+ min:-12, max:12, value:0, step:1, 
+ style:{ pos:'abs', t:50, l:50, w:80, h:80, knobColor:'window(theme.done)', trackColor:'window(theme.channelsColor)' } 
+});
+int.shift = shiftKnob;
+const volKnob = new Knob({
+ min:0, max:2, value:1, step:0.01, 
+ style:{ pos:'abs', t:50, l:150, w:80, h:80, knobColor:'window(theme.done)', trackColor:'window(theme.channelsColor)' }
+});
+int.volume = volKnob;
+modal.add(shiftKnob);
+modal.add(volKnob);
+globalRoot.add(modal);
+`,
+ process: `
     const shiftSteps = fx.automation["pitch shift"] ?? int.shift?.val ?? 0;
     const vol = fx.automation?.volume ?? int.volume?.val ?? 1;
     const shiftFactor = Math.pow(2, shiftSteps / 12);
@@ -643,24 +610,21 @@ int.automations = {
  "boost": { min: 1, max: 4, step: 0.01, defpoint: 1 },
  "limit": { min: 0, max: 1, step: 0.01, defpoint: 0.9 }
 };
-const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'#120000' }});
-const panel = new Node({ style:{ pos:'abs', t:'10%', l:'10%', w:'80%', h:'calc(90% - 70px)', bg:'#220000', pad:20, rad:10 }});
-
+const modal = new Node({ style:{ pos:'abs', t:0, l:0, w:'100vw', h:'100vh', bg:'window(theme.editorBg)' }});
+const panel = new Node({ style:{ pos:'abs', t:'5%', l:'10%', w:'80%', h:'calc(90% - 70px)', bg:'window(theme.boxcolor)', pad:20, rad:10 }});
 const addKnob = (label, prop, min, max, val, x) => {
  const c = new Node({ style:{ pos:'abs', l:x, t:10, w:80, h:120 }});
  int[prop] = new Knob({
   min, max, value:val, sensitivity:0.2,
-  style:{ w:60, h:60, knobColor:'#ff3333', trackColor:'#330000' }
+  style:{ w:60, h:60, knobColor:'window(theme.done)', trackColor:'window(theme.channelsColor)' }
  });
  c.add(int[prop]);
- c.add(new Node({ value:label, style:{ t:0, w:'100%', textAlign:'center', size:10, color:'#ff6666' }}));
+ c.add(new Node({ value:label, style:{ t:0, w:'100%', textAlign:'center', size:10, color:'window(theme.textcolor)' }}));
  panel.add(c);
 };
-
 addKnob("GAIN","gain",0,2,1,"20px");
 addKnob("BOOST","boost",1,4,1,"120px");
 addKnob("LIMIT","limit",0,1,0.9,"220px");
-
 globalRoot.add(modal);
 modal.add(panel);
 `,
@@ -687,291 +651,289 @@ window.Instruments = {
 	"none": {
 		synth: () => 0
 	},
-	"chip osc": {
-	interface: `
-	int.automations={
-		"volume": { min: 0, max: 1, step: 0.1,defpoint:1 },
-			"mod": { min: 0, max: 1, step: 0.025,defpoint:1},
-	}
-        const modal = new Node({
-            style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: '#0b0b11', rad: 0, ov: 'hid' }
-        });
-        const panel = new Node({style:{pos:'abs',t:'5%',l:'5%',w:'90%',h:'calc(90% - 70px)',bg:'#161625',pad:20,rad:10,border:'1px solid #333'}});
-         
-        const waves = ["PWM SQUARE", "TRAPEZOID", "PWM TRIANGLE", "PWM LOGSAW", "SIN LOG MIX"];
-        if (int.waveIdx === undefined) int.waveIdx = 0;
-        if (int.offset === undefined) int.offset = 0;
-        const title = new Node({ value: "OSCILLATOR TYPE: " + waves[int.waveIdx], style: { size: 14, color: '#aaaaff', weight: 'bold', mb: 10 } });
-        panel.add(title);
-        const waveCanvas = new CanvasNode({
-            style: { w: "100%", h: 120, bg: "#000", rad: 5, border: "2px solid #aaaaff33", cursor: "pointer", mt: 10 },
-            onDraw: (c, w, h) => {
-                c.strokeStyle = "#aaaaff";
-                c.lineWidth = 3;
-                c.beginPath();
-                const centerY = h / 2;
-                const amp = h * 0.3;
-                const type = int.waveIdx;
-                const mod = int.modKnob?.val ?? 0.5;
-                const rise = (int.riseKnob?.val ?? 0.1) * 0.5;
-                int.offset = (int.offset + 0.001) % 1.0;
-                for (let x = 0; x < w; x++) {
-                    let p = (x / w*3 + int.offset) % 1.0;
-                    let sig = 0;
-                    
-                    if (type === 0) sig = p < mod ? 1 : -1;
-                    else if (type === 1) {
-                        if (p < rise) sig = -1 + (p / rise) * 2;
-                        else if (p < rise + mod * 0.5) sig = 1;
-                        else if (p < rise * 2 + mod * 0.5) sig = 1 - ((p - (rise + mod * 0.5)) / rise) * 2;
-                        else sig = -1;
-                    }
-                    else if (type === 2) sig = ((p < mod) ? (p / mod) : (1 - (p - mod) / (1 - mod))) * 2 - 1;
-                    else if (type === 3) {
-                        let log = (Math.log(1 + p * 9) / Math.log(10));
-                        sig = (p < mod) ? log : -log;
-                    }
-                    else if (type === 4) {
-                        let logSaw = (Math.log(1 + p * 9) / Math.log(10)) * 2 - 1;
-                        let sinPart = Math.sin(p * Math.PI * 2);
-                        sig = logSaw * (1 - mod) + sinPart * mod;
-                    }
-
-                    let y = centerY - sig * amp;
-                    if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
-                }
-                c.stroke();
-                
-                if (int.riseContainer) {
-                    int.riseContainer.style.opacity = (type === 1) ? 1 : 0;
-                }
-            }
-        });
-        waveCanvas.onClick = () => {
-            int.waveIdx = (int.waveIdx + 1) % waves.length;
-            title.value = "OSCILLATOR TYPE: " + waves[int.waveIdx];
-        };
-        panel.add(waveCanvas);
-        const controls = new Node({ style: { w: '100%', h: 100, mt: 20 } });
-        const addKnob = (label, prop, min, max, val, l) => {
-            const container = new Node({ style: { float: 'left', w: 70, h: 100, l: l } });
-            int[prop] = new Knob({
-                min: min, max: max, value: val, sensitivity: 0.25,
-                style: { w: 60, h: 60, knobColor: '#aaaaff', trackColor: '#222233' }
-            });
-            container.add(int[prop]);
-            container.add(new Node({ value: label, style: { t: 5, w: 60, textAlign: 'center', size: 9, color: '#aaa' } }));
-            controls.add(container);
-            return container; 
-        };
-        addKnob("MOD", "modKnob", 0.0, 1.0, 0.5, 0);
-        int.riseContainer = addKnob("RISE", "riseKnob", 0.01, 0.5, 0.1, 10);
-        addKnob("ATTACK", "attackKnob", 0.0, 1.0, 0.01, 10);
-        addKnob("DECAY", "decayKnob", 0.0, 1.0, 0.2, 10);
-        addKnob("ARP", "arpSpeed", 0, 12, 0, 10);
-        addKnob("GAIN", "gainKnob", 0.0, 3.0, 3, 10);
-        panel.add(controls);
-        modal.add(panel);
-        globalRoot.add(modal);
-    `,
-	synth: `
-        const sr = audioCtx.sampleRate;
-        if (synth.phase === undefined) synth.phase = 0;
-        if (synth.time === undefined) synth.time = 0;
-        if (synth.arpStep === undefined) synth.arpStep = 0;
-        const speedBeats = int?.arpSpeed?.val ?? 0;
-        const waveType = int?.waveIdx ?? 0;
-        const mod1 = int?.modKnob?.val ?? 0.5;
-        const mod2 = synth.automation?.mod ;
-        const mod = (mod2 !== undefined ? mod2 : mod1);
-        const rise = (int?.riseKnob?.val ?? 0.1) * 0.5; 
-        const attackVal = int?.attackKnob?.val ?? 0.01;
-        const decayVal = int?.decayKnob?.val ?? 0.2;
-        const gain = int?.gainKnob?.val ?? 3;
-        const midiSet = synth.pattern?.playingMidi || new Set();
-        const notes = Array.from(midiSet).sort((a, b) => a - b);
-        const shiftMult = synth.fxShiftFreq || 1.0;
-
-let freq = synth.notefreq*shiftMult;
-synth.noChordProgression = false;
-
-if (speedBeats > 0) {
-	synth.noChordProgression = true;
-	const bpm = synth.pattern?.bpm || 120;
-	synth.arpStep += (1 / sr) * ((bpm / 60) * speedBeats) ;
-	
-	if (notes.length > 0) {
-		const idx = Math.floor(synth.arpStep) % notes.length;
-		freq = (440 * Math.pow(2, (notes[idx] - 69) / 12)) * shiftMult;
-	}
+"chip osc": {
+interface: `
+int.automations={
+"volume": { min: 0, max: 1, step: 0.1, defpoint: 1 },
+"volume step": { min: 0, max: 1, step: 0.05, isStep: true },
+"mod": { min: 0, max: 1, step: 0.025, defpoint: 1 },
+"pitchUp": { min: 0, max: 24, step: 1, isStep: true },
+"pitchDown": { min: 0, max: 24, step: 1, isStep: true },
+"arpSpeed": { min: 0, max: 16, step: 1, isStep: true },
+"arpDir": { min: 0, max: 1, step: 1, isStep: true }
 }
-        synth.phase += freq / sr;
-        if (synth.phase >= 1.0) synth.phase -= 1.0;
-        const p = synth.phase;
-        let sig = 0;
-        if (waveType === 0) sig = p < mod ? 1 : -1;
-        else if (waveType === 1) {
-            if (p < rise) sig = -1 + (p / rise) * 2;
-            else if (p < rise + mod * 0.5) sig = 1;
-            else if (p < rise * 2 + mod * 0.5) sig = 1 - ((p - (rise + mod * 0.5)) / rise) * 2;
-            else sig = -1;
-        }
-        else if (waveType === 2) sig = ((p < mod) ? (p / mod) : (1 - (p - mod) / (1 - mod))) * 2 - 1;
-        else if (waveType === 3) {
-            let log = (Math.log(1 + p * 9) / Math.log(10));
-            sig = (p < mod) ? log : -log;
-        }
-        else if (waveType === 4) {
-            let logSaw = (Math.log(1 + p * 9) / Math.log(10)) * 2 - 1;
-            let sinPart = Math.sin(p * Math.PI * 2);
-            sig = logSaw * (1 - mod) + sinPart * mod;
-        }
-        let env = 0;
-        const aTime = attackVal * 2.0;
-        if (synth.time < aTime) {
-            env = synth.time / aTime;
-        } else {
-            const dTime = synth.time - aTime;
-            const speed = Math.pow(decayVal, 2) * 50;
-            env = Math.exp(-dTime * speed);
-        }
-        const remaining = synth.duration - synth.time;
-        if (remaining < 0.001) {
-         env *= Math.max(0, remaining / 0.001);
-        }
-        if (synth.time > synth.duration) synth.disconnect = true;
-        synth.time += 1 / sr;
-        const vol = synth.automation?.volume ?? 1;
-        const defVol = 1;
-        const finalVol = (vol !== undefined ? vol : defVol);
-        const final = (sig * env * gain * 0.15) * finalVol;
-        synth.outL = final;
-        synth.outR = final;
-    `
-} ,
-"wave player": {
-	interface: `
-    int.saved = int.saved || {};
-    const modal = new Node({
-        style:{ pos:'abs', t:'0', l:'0', w:'100vw', h:'100vh', bg:'#111' }
-    });
-    const panel = new Node({
-        style:{ pos:'abs', t:'5%', l:'5%', w:'90%', h:'calc(90% - 70px)', bg:'#222', pad:20, rad:10, border:'1px solid #444' }
-    });
-    
-    const label = new Node({ value:"LOAD AUDIO FILE (MP3/WAV)", style:{ size:12, color:'#66aaff', mb:10, weight:'bold' }});
-    panel.add(label);
+const modal = new Node({
+style: { pos: 'abs', t: '0', l: '0', w: '100vw', h: '100vh', bg: 'window(theme.editorBg)', rad: 0, ov: 'hid' }
+});
+const panel = new Node({style:{pos:'abs',t:'5%',l:'5%',w:'90%',h:'calc(90% - 70px)',bg:'window(theme.boxcolor)',pad:20,rad:10,border:'1px solid #333'}});
+    const waves = ["PWM SQUARE", "TRAPEZOID", "PWM TRIANGLE", "PWM LOGSAW", "SIN LOG MIX"];
+    if (int.waveIdx === undefined) int.waveIdx = 0;
+    if (int.offset === undefined) int.offset = 0;
+    const title = new Node({ value: "OSCILLATOR TYPE: " + waves[int.waveIdx], style: { size: 14, color: 'window(theme.textcolor)', weight: 'bold', mb: 10 } });
+    panel.add(title);
+    const waveCanvas = new CanvasNode({
+        style: { w: "100%", h: 120, bg: "window(theme.editorBg)", rad: 5, border: "2px solid #aaaaff33", cursor: "pointer", mt: 10 },
+        onDraw: (c, w, h) => {
+            c.strokeStyle = theme.done;
+            c.lineWidth = 3;
+            c.beginPath();
+            const centerY = h / 2;
+            const amp = h * 0.3;
+            const type = int.waveIdx;
+            const mod = int.modKnob?.val ?? 0.5;
+            const rise = (int.riseKnob?.val ?? 0.1) * 0.5;
+            int.offset = (int.offset + 0.001) % 1.0;
+            for (let x = 0; x < w; x++) {
+                let p = (x / w*3 + int.offset) % 1.0;
+                let sig = 0;
+                
+                if (type === 0) sig = p < mod ? 1 : -1;
+                else if (type === 1) {
+                    if (p < rise) sig = -1 + (p / rise) * 2;
+                    else if (p < rise + mod * 0.5) sig = 1;
+                    else if (p < rise * 2 + mod * 0.5) sig = 1 - ((p - (rise + mod * 0.5)) / rise) * 2;
+                    else sig = -1;
+                }
+                else if (type === 2) sig = ((p < mod) ? (p / mod) : (1 - (p - mod) / (1 - mod))) * 2 - 1;
+                else if (type === 3) {
+                    let log = (Math.log(1 + p * 9) / Math.log(10));
+                    sig = (p < mod) ? log : -log;
+                }
+                else if (type === 4) {
+                    let logSaw = (Math.log(1 + p * 9) / Math.log(10)) * 2 - 1;
+                    let sinPart = Math.sin(p * Math.PI * 2);
+                    sig = logSaw * (1 - mod) + sinPart * mod;
+                }
 
-    int.fileInput = new InputFile({
-        accept: "audio/*",
-        proxy: int,
-        style:{ w:250, h:35, bg:'#333', color:'#fff', rad:5 }
-    });
-    
-    int.fileInput.onChange = async (file) => {
-        try {
-            const arr = await file.arrayBuffer();
-            const decoded = await audioCtx.decodeAudioData(arr);
-            int.audioBuffer = decoded;  
-            label.value = "LOADED: " + file.name;
-        } catch (e) {
-            console.error("Load Error:", e);
-            label.value = "ERROR LOADING FILE";
+                let y = centerY - sig * amp;
+                if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
+            }
+            c.stroke();
+            if (int.riseContainer) {
+                int.riseContainer.style.opacity = (type === 1) ? 1 : 0;
+            }
         }
+    });
+    waveCanvas.onClick = () => {
+        int.waveIdx = (int.waveIdx + 1) % waves.length;
+        title.value = "OSCILLATOR TYPE: " + waves[int.waveIdx];
     };
-    panel.add(int.fileInput);
-    
-    const controls = new Node({ style: { w:'100%', h:150, mt:20 } });
-    
-    const addKnob = (name, prop, min, max, val, l) => {
-        const c = new Node({ style: { float:'left', w:80, h:120, ml:l } });
+    panel.add(waveCanvas);
+    const controls = new Node({ style: { w: '100%', h: 100, mt: 20 } });
+    const addKnob = (label, prop, min, max, val, l) => {
+        const container = new Node({ style: { float: 'left', w: 70, h: 100, l: l } });
         int[prop] = new Knob({
-            min: min, max: max, value: val,
-            style: { w:60, h:60, knobColor:'#66aaff', trackColor:'#111' }
+            min: min, max: max, value: val, sensitivity: 0.25,
+            style: { w: 60, h: 60, knobColor: 'window(theme.done)', trackColor: 'window(theme.channelsColor)' }
         });
-        c.add(int[prop]);
-        c.add(new Node({ value: name, style: { t:5, w:60, textAlign:'center', size:10, color:'#888' } }));
-        controls.add(c);
+        container.add(int[prop]);
+        container.add(new Node({ value: label, style: { t: 5, w: 60, textAlign: 'center', size: 9, color: 'window(theme.textcolor)' } }));
+        controls.add(container);
+        return container; 
     };
-
-    addKnob("ROOT", "rootKnob", 12, 108, 60, 0);
-    addKnob("VOL", "volKnob", 0, 2, 1, 10);
-    addKnob("PAN", "panSlider", -1, 1, 0, 10);
-    addKnob("EASE OUT", "easeOut", 0, 2.0, 0, 10); 
-
-    if (int.loop === undefined) int.loop = false;
-    const loopBtn = new Node({
-        value: int.loop ? "MODE: LOOP" : "MODE: ONCE",
-        style: { float:'left', w:120, h:40, bg:'#333', color:'#fff', rad:5, ml:20, mt:10, textAlign:'center', lineHeight:'40px', cursor:'pointer' }
-    });
-    loopBtn.onClick = () => {
-        int.loop = !int.loop;
-        loopBtn.value = int.loop ? "MODE: LOOP" : "MODE: ONCE";
-    };
-    controls.add(loopBtn);
-
+    addKnob("MOD", "modKnob", 0.0, 1.0, 0.5, 0);
+    int.riseContainer = addKnob("RISE", "riseKnob", 0.01, 0.5, 0.1, 10);
+    addKnob("ATTACK", "attackKnob", 0.0, 1.0, 0.01, 10);
+    addKnob("DECAY", "decayKnob", 0.0, 1.0, 0.2, 10);
+    addKnob("ARP", "arpSpeed", 0, 12, 0, 10);
+    addKnob("GAIN", "gainKnob", 0.0, 3.0, 3, 10);
     panel.add(controls);
     modal.add(panel);
     globalRoot.add(modal);
-    `,
-	synth: `
-    if (!int.audioBuffer || !int.audioBuffer.left) return;
-
-    if (synth.playhead === undefined) synth.playhead = 0;
-    if (synth.time === undefined) synth.time = 0;
-
-    const dataL = int.audioBuffer.left;
-    const dataR = int.audioBuffer.right;
-    const len = dataL.length;
+`,
+synth: `
     const sr = audioCtx.sampleRate;
-    
+    if (synth.phase === undefined) synth.phase = 0;
+    if (synth.time === undefined) synth.time = 0;
+    if (synth.arpStep === undefined) synth.arpStep = 0;
+    const autoSpeed = synth.automation?.arpSpeed;
+    const speedBeats = autoSpeed !== undefined ? autoSpeed : (int?.arpSpeed?.val ?? 0);
+    const autoDir = synth.automation?.arpDir;
+    const arpDir = autoDir !== undefined ? autoDir : 1;
+    const waveType = int?.waveIdx ?? 0;
+    const mod1 = int?.modKnob?.val ?? 0.5;
+    const mod2 = synth.automation?.mod ;
+    const mod = (mod2 !== undefined ? mod2 : mod1);
+    const rise = (int?.riseKnob?.val ?? 0.1) * 0.5; 
+    const attackVal = int?.attackKnob?.val ?? 0.01;
+    const decayVal = int?.decayKnob?.val ?? 0.2;
+    const gain = int?.gainKnob?.val ?? 3;
+    const midiSet = synth.pattern?.playingMidi || new Set();
+    let notes = Array.from(midiSet).sort((a, b) => a - b);
+    if (arpDir === 0) notes.reverse();
+    const pUp = synth.automation?.pitchUp ?? 0;
+    const pDown = synth.automation?.pitchDown ?? 0;
+    const pitchOffset = pUp - pDown;
+    const pitchMult = Math.pow(2, pitchOffset / 12);
+    const shiftMult = (synth.fxShiftFreq || 1.0) * pitchMult;
+    let freq = synth.notefreq * shiftMult;
+    synth.noChordProgression = false;
+    if (speedBeats > 0) {
+        synth.noChordProgression = true;
+        const bpm = synth.pattern?.bpm || 120;
+        synth.arpStep += (1 / sr) * ((bpm / 60) * speedBeats) ;
+        
+        if (notes.length > 0) {
+            const idx = Math.floor(synth.arpStep) % notes.length;
+            freq = (440 * Math.pow(2, (notes[idx] - 69) / 12)) * shiftMult;
+        }
+    }
+    synth.phase += freq / sr;
+    if (synth.phase >= 1.0) synth.phase -= 1.0;
+    const p = synth.phase;
+    let sig = 0;
+    if (waveType === 0) sig = p < mod ? 1 : -1;
+    else if (waveType === 1) {
+        if (p < rise) sig = -1 + (p / rise) * 2;
+        else if (p < rise + mod * 0.5) sig = 1;
+        else if (p < rise * 2 + mod * 0.5) sig = 1 - ((p - (rise + mod * 0.5)) / rise) * 2;
+        else sig = -1;
+    }
+    else if (waveType === 2) sig = ((p < mod) ? (p / mod) : (1 - (p - mod) / (1 - mod))) * 2 - 1;
+    else if (waveType === 3) {
+        let log = (Math.log(1 + p * 9) / Math.log(10));
+        sig = (p < mod) ? log : -log;
+    }
+    else if (waveType === 4) {
+        let logSaw = (Math.log(1 + p * 9) / Math.log(10)) * 2 - 1;
+        let sinPart = Math.sin(p * Math.PI * 2);
+        sig = logSaw * (1 - mod) + sinPart * mod;
+    }
+    if (synth.time > synth.duration) synth.disconnect = true;
+    let env = 0;
+    const aTime = attackVal * 2.0;
+    if (synth.time < aTime) {
+        env = synth.time / aTime;
+    } else {
+        const dTime = synth.time - aTime;
+        const speed = Math.pow(decayVal, 2) * 50;
+        env = Math.exp(-dTime * speed);
+    }
+    const remaining = synth.duration - synth.time;
+    if (remaining < 0.001) {
+     env *= Math.max(0, remaining / 0.001);
+    }
+    if (env < 0.0001 && synth.time > aTime) {
+  	synth.disconnect = true;
+   }
+    const vol = synth.automation?.volume ?? 1;
+    const vol2 = synth.automation["volume step"] ?? 1;
+    const finalVol = vol*vol2;
+    const final = (sig * env * gain * 0.15) * finalVol;
+    synth.outL = final;
+    synth.outR = final;
+`
+
+},
+"wave player": {
+	interface: `
+int.saved = int.saved || {};
+const modal = new Node({
+ style:{ pos:'abs', t:'0', l:'0', w:'100vw', h:'100vh', bg:'window(theme.editorBg)' }
+});
+const panel = new Node({
+ style:{ pos:'abs', t:'5%', l:'5%', w:'90%', h:'calc(90% - 70px)', bg:'window(theme.boxcolor)', pad:20, rad:10, border:'1px solid window(theme.border)' }
+});
+const label = new Node({ value:"LOAD AUDIO FILE (MP3/WAV)", style:{ size:12, color:'window(theme.done)', mb:10, weight:'bold' }});
+panel.add(label);
+int.fileInput = new InputFile({
+ accept: "audio/*",
+ proxy: int,
+ style:{ w:250, h:35, bg:'window(theme.channelsColor)', color:'window(theme.textcolor)', rad:5 }
+});
+int.fileInput.onChange = async (file) => {
+ try {
+  const arr = await file.arrayBuffer();
+  const decoded = await audioCtx.decodeAudioData(arr);
+  int.audioBuffer = {
+   left: decoded.getChannelData(0),
+   right: decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : decoded.getChannelData(0),
+   length: decoded.length
+  };
+ } catch (e) {
+ }
+};
+panel.add(int.fileInput);
+const controls = new Node({ style: { w:'100%', h:150, mt:20 } });
+const addKnob = (name, prop, min, max, val, l) => {
+ const c = new Node({ style: { float:'left', w:80, h:120, ml:l } });
+ int[prop] = new Knob({
+  min: min, max: max, value: val,
+  style: { w:60, h:60, knobColor:'window(theme.done)', trackColor:'window(theme.channelsColor)' }
+ });
+ c.add(int[prop]);
+ c.add(new Node({ value: name, style: { t:5, w:60, textAlign:'center', size:10, color:'window(theme.textcolor)' } }));
+ controls.add(c);
+};
+addKnob("ROOT","rootKnob",12,108,60,0);
+addKnob("VOL","volKnob",0,2,1,10);
+addKnob("PAN","panSlider",-1,1,0,10);
+addKnob("EASE OUT","easeOut",0,2.0,0,10);
+if (int.loop === undefined) int.loop = false;
+const loopBtn = new Node({
+ value: int.loop ? "MODE: LOOP" : "MODE: ONCE",
+ style: { float:'left', w:120, h:40, bg:'window(theme.channelsColor)', color:'window(theme.textcolor)', rad:5, ml:20, mt:10, textAlign:'center', lineHeight:'40px', cursor:'pointer' }
+});
+loopBtn.onClick = () => {
+ int.loop = !int.loop;
+ loopBtn.value = int.loop ? "MODE: LOOP" : "MODE: ONCE";
+};
+controls.add(loopBtn);
+panel.add(controls);
+modal.add(panel);
+globalRoot.add(modal);
+`,
+	synth: `
+if (!int.audioBuffer || !int.audioBuffer.left) return;
+if (synth.playhead2 === undefined) {
+    synth.playhead2 = 0;
+    synth.time = 0;
+}
+const dataL = int.audioBuffer.left;
+const dataR = int.audioBuffer.right;
+const len = int.audioBuffer.length; 
+    const sr = audioCtx.sampleRate;
     const root = int.rootKnob?.val ?? 60;
     const vol = int.volKnob?.val ?? 1.0;
     const easeOut = int.easeOut ? int.easeOut.val : 0;
-    
-    const ratio = Math.pow(2, (synth.noteNumber - root) / 12);
-    if (synth.playhead >= len - 1) {
+    const shiftMult = (synth.fxShiftFreq || 1.0) * 1;
+    const ratio = Math.pow(2, (synth.noteNumber - root) / 12)*shiftMult;
+    if (synth.playhead2 >= len - 1) {
         if (int?.loop) {
-            synth.playhead = 0;
+            synth.playhead2 = 0;
         } else {
-            synth.disconnect = true;
-            return;
+           synth.disconnect = true;
         }
     }
-
-    let i0 = Math.floor(synth.playhead);
+    let i0 = Math.floor(synth.playhead2);
     let i1 = i0 + 1 >= len ? i0 : i0 + 1;
-    let fract = synth.playhead - i0;
+    let fract = synth.playhead2 - i0;
     let sL = dataL[i0] + (dataL[i1] - dataL[i0]) * fract;
     let sR = dataR[i0] + (dataR[i1] - dataR[i0]) * fract;
-
     let env = 1;
     if (synth.time > synth.duration) {
-        if (easeOut > 0) {
-            const releaseTime = synth.time - synth.duration;
-            env = Math.exp(-releaseTime * (1 / easeOut) * 5);
-        } else {
-            env = 0;
+    if (easeOut > 0) {
+        const releaseTime = synth.time - synth.duration;
+        env = Math.exp(-releaseTime * (1 / easeOut) * 5);
+        if (env < 0.001) {
+            synth.disconnect = true;
         }
-    } else if (synth.time > synth.duration - 0.02) {
-        if (easeOut <= 0) {
-            env = Math.max(0, (synth.duration - synth.time) / 0.02);
-        }
+    } else {
+        env = 0;
+        synth.disconnect = true;
     }
+} else if (synth.time > synth.duration - 0.02) {
+    if (easeOut <= 0) {
+        env = Math.max(0, (synth.duration - synth.time) / 0.02);
+    }
+}
 
     const pan = int.panSlider?.val ?? 0;
     const final = env * vol * 0.7;
     synth.outL = sL * final * Math.min(1, 1 - pan);
     synth.outR = sR * final * Math.min(1, 1 + pan);
-
-    synth.playhead += ratio;
-    synth.time += 1 / sr;
-    const isFinished = (easeOut > 0) ? (env < 0.001) : (synth.time >= synth.duration);
-    if (isFinished && !int?.loop) {
-        synth.disconnect = true;
-    }
+    synth.playhead2 += ratio;
     `
 },
 };
-
- 
+  
