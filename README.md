@@ -30,7 +30,7 @@ https://kashumy.github.io/Open-Sound/
 https://github.com/Kashumy/Open-Sound/raw/refs/heads/main/OPSPLUGINS.zip
 
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![GitHub stars](https://img.shields.io/github/stars/Kashumy/Open-Sound?style=social)
 ![Last commit](https://img.shields.io/github/last-commit/Kashumy/Open-Sound)
 
