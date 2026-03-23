@@ -2,7 +2,7 @@
 
 <h2>
 <img src="https://raw.githubusercontent.com/Kashumy/Open-Sound/main/favicon.png" width="50" align="center">  
-Open-Sound (OPS)
+Open-Sound (OPS) V1.6
 </h2>
 
 <div align="center">
