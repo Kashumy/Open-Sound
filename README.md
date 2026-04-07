@@ -1,3 +1,5 @@
+
+
 <div align="center">
 
 <h2>
@@ -13,28 +15,27 @@ Free Open-Source DAW written in <br>
 
 </div>
 
-OPS is inspired by popular music software such as **FL Studio, Ableton, GarageBand, and BandLab**. Unlike these, it focuses on **simplicity, speed, and cross-platform usability**.
 
-Unlike most web apps, the interface is built **almost entirely with HTML Canvas** — meaning **very few DOM elements** and a **custom UI engine** designed specifically for audio production.
+OPS is a web-based DAW inspired by modern music production tools such as **FL Studio, Ableton, GarageBand, BandLab, and BeepBox**.
+Instead of competing on feature complexity, it focuses on **simplicity, speed, and cross-platform usability**.
 
-> This is my **largest and most advanced web-based tool** to date.
+Unlike most web applications, the interface is built **almost entirely with HTML Canvas**, using a **custom UI engine** designed specifically for audio workflows. This allows for a more responsive and controlled experience with minimal reliance on standard DOM elements.
+
+> This is my most ambitious web-based project so far, aimed at exploring efficient audio tools in the browser.
 
 ---
 
 ## Live Demo
 
-**Launch in the browser:**  
-https://kashumy.github.io/Open-Sound/
+**Launch in the browser:**
+[https://kashumy.github.io/Open-Sound/](https://kashumy.github.io/Open-Sound/)
 
-**Example Plugins:**  
-https://github.com/Kashumy/Open-Sound/raw/refs/heads/main/OPSPLUGINS.zip
-
+**Example Plugins:**
+[https://github.com/Kashumy/Open-Sound/raw/refs/heads/main/OPSPLUGINS.zip](https://github.com/Kashumy/Open-Sound/raw/refs/heads/main/OPSPLUGINS.zip)
 
 ![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![GitHub stars](https://img.shields.io/github/stars/Kashumy/Open-Sound?style=social)
 ![Last commit](https://img.shields.io/github/last-commit/Kashumy/Open-Sound)
-
----
 
 # How to Use
 
@@ -107,6 +108,3 @@ https://github.com/Kashumy/Open-Sound/raw/refs/heads/main/OPSPLUGINS.zip
 
 OPS is **actively under development**, and many features are still in development.  
 If you find a bug or encounter issues, you can help by submitting them on **GitHub Issues**. Feedback and suggestions are also welcome.
-
-
-
