@@ -17,7 +17,7 @@ Free Open-Source DAW written in <br>
 
 
 OPS is a web-based DAW inspired by modern music production tools such as **FL Studio, Ableton, GarageBand, BandLab, and BeepBox**.
-Instead of competing on feature complexity, it focuses on **simplicity, speed, and cross-platform usability**.
+it focuses on **simplicity, speed, and cross-platform usability**.
 
 Unlike most web applications, the interface is built **almost entirely with HTML Canvas**, using a **custom UI engine** designed specifically for audio workflows. This allows for a more responsive and controlled experience with minimal reliance on standard DOM elements.
 
